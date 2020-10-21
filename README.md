@@ -47,10 +47,12 @@ for n in layer1.children:
 ## 오차역전법
 은닉층이 한개면 구하는게 쉬웠는데 여러개일때와 이를 일반화 하는게 어려웠음<br>
 처음엔 맨끝부터 시작해 각 뉴런을 확인하면서 변수에 저장하는 방법을 썼는데 식이 너무 어려워지고 메모리도 너무 많이 사용<br>
+<img src="https://user-images.githubusercontent.com/21963949/96717512-8b442380-13e1-11eb-87d8-7f9de06baa86.jpg" height="1000">
 ## 재귀함수
 그냥 너무 머리아프니까 현재 뉴런에서 이전 뉴런들에게 정보를 제공하면서 접속하는 재귀함수 형식을 생각해봄<br>
 특히 은닉층으로 점점 들어갈수록 필요한 정보들을 앞에서 미리 계산해 놓을수 있었기 때문에 이 방식을 사용<br>
-식이 맞는지는 아직도 모르겠음...
+식이 맞는지는 아직도 모르겠음...<Br>
+<img src="https://user-images.githubusercontent.com/21963949/96717510-897a6000-13e1-11eb-99fb-1033d2a1c5b9.jpg" height="1000">
 ```python
 class nneuron:
     def ProvideZ(self): #sigma(이전 레이어 값들*W)+B
