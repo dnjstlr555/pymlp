@@ -1,7 +1,8 @@
 import random
 from sympy import *
 from sympy.abc import A,B
-x= Symbol('x')
+import numpy as np
+x,y,z= symbols('x y z')
 
 class nsystem:
     def __init__(self):
@@ -25,9 +26,31 @@ class nsystem:
                 return
     def out(self):
         return self.children[len(self.children)-1]
+    def fastfeed(self, input):
+        self.feed(input)
+        self.Activate()
+        return self.out().GetAllSig()
+    def evaluate(self, result):
+        temp=0
+        for i, n in enumerate(self.out().children):
+            temp+=(n.sig-result[i])**2
+        return temp/len(self.out().children)
     def Activate(self):
         for l in self.children:
             l.ActivateLayer()
+    def CreateLayer(self, number, inputSize):
+        layer=[]
+        for i in range(number):
+            layer.append(self.Add())
+        self.CreateNeurons(inputSize, layer[0], Normal, 0)
+        return layer
+    def CreateNeurons(self, number, layer, function, sig):
+        neu=[]
+        for i in range(number):
+            n=layer.Add(function)
+            n.sig=sig
+            neu.append(n)
+        return neu
     def ToString(self):
         nstr=f'Sys -->\n'
         for n in self.children:
@@ -69,6 +92,9 @@ class nlayer:
         prevLayer=self.sys.ProvidePrevLayer(self)
         prevSig=prevLayer.GetAllSig()
         return prevSig
+    def ProvidePrevNeu(self):
+        prevLayer=self.sys.ProvidePrevLayer(self)
+        return prevLayer.children
     def ActivateLayer(self):
         if self.index is 0:
             return
@@ -83,78 +109,71 @@ class nneuron:
         self.w = [None for x in range(len(self.layer.ProvidePrevSig()))]
         self.b = 0
         self.f = Normal
-        self.zi = (x*A)
-        self.z=lambdify([x, A], self.zi)
     def ActivateEach(self):
-        prevSig=self.layer.ProvidePrevSig()
         self.sig=0
         f=lambdify(x, self.f)
-        for i, sig in enumerate(prevSig):
-            if self.w[i] is None:
-                self.w[i]=random.uniform(-1,1)
-            self.sig+=self.z(sig,self.w[i])
-        self.sig=f(self.sig+self.b)
+        self.sig=f(self.ProvideZ())
     def ProvideZ(self):
         prevSig=self.layer.ProvidePrevSig()
         providz=0
         for i, sig in enumerate(prevSig):
             if self.w[i] is None:
-                self.w[i]=random.uniform(-1,1)
-            providz+=self.z(sig,self.w[i])
+                self.w[i]=1 #random.uniform(,1)
+            providz+=self.w[i]*sig
         return providz+self.b
+    def deltaHZ(self):
+        return diff(self.f).subs(x,self.ProvideZ())
+    def back(self, **kwargs):
+        if self.layer.index<=0: return 0
+        temp=0
+        t=None
+        predict=[]
+        for key, value in kwargs.items():
+            if key=="predict": 
+                predict=value
+            elif key=="t": 
+                t=value
+        if predict is None: return -1      
+        if t is None:
+            temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ())
+        else:
+            temp=t*self.deltaHZ()  
+        for i, n in enumerate(self.layer.ProvidePrevNeu()):
+            #print(f"NEW W{self.layer.index}_{self.index}/(prev{i}) {self.w[i]}->{self.w[i]-(temp*n.sig)} temp:{temp} t:{t} n.sig:{n.sig} (self.deltaHZ:{self.deltaHZ()} self.sig:{self.sig} predict:{predict} len : {2/len(self.layer.children)}")
+            provid=temp*self.w[i]
+            self.w[i]-=temp*n.sig*0.1
+            n.back(predict=predict, t=provid)
+        self.b-=temp*0.1
     def ToString(self):
-        return f'index:{self.index}\nsig:{self.sig}\nweights:{self.w}\nbias:{self.b}'
+        return f'  ({self.index})sig:{self.sig} weights:{self.w} bias:{self.b}'
     def ToStringOnlySig(self):
         return f'({self.sig})'
+Normal=x
+ReLU=Max(0,x)
 
-def CreateLayer(number,sys, inputSize):
-    layer=[]
-    for i in range(number):
-        layer.append(sys.Add())
-    CreateNeurons(inputSize, layer[0], Normal, 0)
-    return layer
-
-def CreateNeurons(number, layer, function, sig):
-    neu=[]
-    for i in range(number):
-        n=layer.Add(function)
-        n.sig=sig
-        neu.append(n)
-    return neu
 
 def train(sys, inputData, result):
     sys.feed(inputData)
     sys.Activate()
-    out = sys.out()
-    score=0
-    for layer in sys.children[::-1]:
-        for i, neu in enumerate(layer.children):
-            if neu.layer.index<=0:
-                break
-            dc=diff(Cost, x)
-            da=diff(neu.f,x)
-            t=dc.subs(x, neu.sig).subs(A, result[i])*da.subs(x, neu.ProvideZ())
-            print(neu.ToString())
-            for i, weight in enumerate(neu.w):
-                neu.w[i]=weight - (t*neu.layer.ProvidePrevSig()[i])
-            neu.b=neu.b - t*1
-            print(t)
-            print(neu.ToString())
-
-ReLU=Max(0,x)
-Normal=x
-Cost=(x-A)**2
-c=lambdify([x, A], Cost)
+    #print(f'{inputData} -> Precdiction: {result} Predict:{sys.evaluate(result)}')
+    for i, n in enumerate(sys.out().children):
+        n.back(predict=result[i])
+    
 
 sys=nsystem()
-layer=CreateLayer(3, sys, 2)
-CreateNeurons(2, layer[1], ReLU, 1)
-CreateNeurons(2, layer[2], ReLU, 1)
+layer=sys.CreateLayer(3, 2)
+sys.CreateNeurons(2, layer[1], ReLU, 1)
+sys.CreateNeurons(1, layer[2], ReLU, 1)
 
 
-print(sys.ToStringOnlySig())
-train(sys, [1,0], [1,1])
-train(sys, [1,0], [1,1])
-train(sys, [1,0], [1,1])
-train(sys, [1,0], [1,1])
-print(sys.ToStringOnlySig())
+for i in range(500):
+    rand = random.choice((0,1))
+    if rand==0:
+        train(sys, [random.uniform(0,0.3),random.uniform(0,0.3)], [0])
+    else:
+        train(sys, [random.uniform(0.7,1),random.uniform(0.7,1)], [1])
+
+print(sys.ToString())
+print(sys.fastfeed([0.5,0.5]))
+print(sys.fastfeed([0.1,0.1]))
+print(sys.fastfeed([1,1]))
