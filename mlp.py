@@ -1,8 +1,7 @@
 import random
-from sympy import *
-from sympy.abc import A,B
 import numpy as np
-x,y,z= symbols('x y z')
+import sympy
+x,y,z= sympy.symbols('x y z') 
 
 class nsystem:
     def __init__(self):
@@ -111,18 +110,18 @@ class nneuron:
         self.f = Normal
     def ActivateEach(self):
         self.sig=0
-        f=lambdify(x, self.f)
-        self.sig=f(self.ProvideZ())
+        #ft=sympy.lambdify(x, self.f, np)
+        self.sig=self.f.subs(x, self.ProvideZ()) 
     def ProvideZ(self):
         prevSig=self.layer.ProvidePrevSig()
         providz=0
         for i, sig in enumerate(prevSig):
             if self.w[i] is None:
-                self.w[i]=1 #random.uniform(,1)
+                self.w[i]=random.uniform(0.5,1)
             providz+=self.w[i]*sig
         return providz+self.b
     def deltaHZ(self):
-        return diff(self.f).subs(x,self.ProvideZ())
+        return sympy.diff(self.f).subs(x,self.ProvideZ())
     def back(self, **kwargs):
         if self.layer.index<=0: return 0
         temp=0
@@ -139,7 +138,6 @@ class nneuron:
         else:
             temp=t*self.deltaHZ()  
         for i, n in enumerate(self.layer.ProvidePrevNeu()):
-            #print(f"NEW W{self.layer.index}_{self.index}/(prev{i}) {self.w[i]}->{self.w[i]-(temp*n.sig)} temp:{temp} t:{t} n.sig:{n.sig} (self.deltaHZ:{self.deltaHZ()} self.sig:{self.sig} predict:{predict} len : {2/len(self.layer.children)}")
             provid=temp*self.w[i]
             self.w[i]-=temp*n.sig*0.1
             n.back(predict=predict, t=provid)
@@ -149,8 +147,8 @@ class nneuron:
     def ToStringOnlySig(self):
         return f'({self.sig})'
 Normal=x
-ReLU=Max(0,x)
-
+ReLU=sympy.Max(0,x)
+Sigmoid=1/(1+sympy.exp(x))
 
 def train(sys, inputData, result):
     sys.feed(inputData)
@@ -161,19 +159,32 @@ def train(sys, inputData, result):
     
 
 sys=nsystem()
-layer=sys.CreateLayer(3, 2)
-sys.CreateNeurons(2, layer[1], ReLU, 1)
-sys.CreateNeurons(1, layer[2], ReLU, 1)
+layer=sys.CreateLayer(3,2)
+sys.CreateNeurons(4, layer[1], ReLU, 1)
+sys.CreateNeurons(1, layer[2], Sigmoid, 1)
 
-
-for i in range(500):
+cnt1=0
+cnt2=0
+for i in range(1000):
     rand = random.choice((0,1))
+    
     if rand==0:
-        train(sys, [random.uniform(0,0.3),random.uniform(0,0.3)], [0])
+        train(sys, [random.uniform(0.01,0.3),random.uniform(0.01,0.3)], [0.01])
+        cnt1+=1
     else:
-        train(sys, [random.uniform(0.7,1),random.uniform(0.7,1)], [1])
+        train(sys, [random.uniform(0.8,0.99),random.uniform(0.8,0.99)], [0.99])
+        cnt2+=1
+    
+    if i%10==0: 
+        sys.fastfeed([1,1])
+        print(f"train for 0 -> {cnt1} / 1 -> {cnt2}")
+        print(f"evaluates for [1,1] {sys.evaluate([1])}")
+        sys.fastfeed([0.1,0.1])
+        print(f"evaluates for [0.1,0.1] {sys.evaluate([0])}")
 
-print(sys.ToString())
 print(sys.fastfeed([0.5,0.5]))
 print(sys.fastfeed([0.1,0.1]))
-print(sys.fastfeed([1,1]))
+print(sys.fastfeed([0.9,0.9]))
+print(sys.fastfeed([0,1]))
+print(sys.fastfeed([33,33]))
+print(sys.ToString())
