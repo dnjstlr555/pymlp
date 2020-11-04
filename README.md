@@ -266,3 +266,146 @@ Layer 1 -->
 Layer 2 -->
   (0)sig:1.00000000000000 weights:[-1.91900344659907, -0.599164971956029, -0.963092336634339, 0.736683216914006] bias:1.77679866970300
 ```
+# 4
+현재 학습은 출력층의 뉴런 개수가 1개일때만 제대로 작동함.
+## 학습 방법 고치기
+```
+train for 0 -> 492 / 1 -> 489
+evaluates for [1,1] 0.506095656357142
+evaluates for [0.1,0.1] 0.0429059494634863
+train for 0 -> 498 / 1 -> 493
+evaluates for [1,1] 0.506535316633274
+evaluates for [0.1,0.1] 0.0407663545388226
+[0.565476206260165, 0.0213041669706672] ([0.5,0.5])
+[0.238739204886161, 0.158851891278846] ([0.1,0.1])
+[0.843755314536744, 0.00250279573365795] ([0.9,0.9])
+[0.572570953721872, 0.0209073311553977] [0,1]
+[1.00000000000000, 1.26092720310890e-78] [33,33]
+```
+출력층의 뉴런 갯수를 2개로 늘렸는데 한쪽만 잘 학습이 되고 오른쪽 출력층은 아예 학습이 안되는 모습을 보였습니다.
+## 검증
+```python
+def back(self, **kwargs):
+  if self.layer.index<=0: return 0
+  temp=0
+  t=None
+  predict=[]
+  for key, value in kwargs.items():
+      if key=="predict": 
+          predict=value
+      elif key=="t": 
+          t=value #이전 레이어의 뉴런에서 받은 값
+  if predict is None: return -1 
+  if t is None: #처음의 경우
+      temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) #이 식의 결과는 dCo/dZo(n), n번째 출력 결과에 대한 비용함수의 미분
+  else:
+      temp=t*self.deltaHZ()  
+  for i, n in enumerate(self.layer.ProvidePrevNeu()):
+      provid=temp*self.w[i]
+      self.w[i]-=temp*n.sig*0.1
+      n.back(predict=predict, t=provid)
+  self.b-=temp*0.1
+```
+```python
+temp=t*self.deltaHZ()
+```
+전체 비용함수에 대한 미분 결과를 구해야 했는데, 식 검증 과정에서 무언가 놓친게 있는것 같았습니다. <br>
+식을 계산해 보면서 생긴 가장 큰 문제는 깊은 은닉층의 계산이었습니다. <br>
+render.png
+위 식의 결과는 첫번째 은닉층에 대한 비용함수의 미분 결과를 나타냅니다 <br>
+여기까지는 별 무리가 없지만 그 다음 더 깊은 은닉층을 구할때 식 자체는 같은데.. 결과가 다를것 같은 놈이 생깁니다<br>
+render-3.png
+render-2.png
+Z 함수는 필터를 거치기 전 이전 레이어에서의 총 계산 결과입니다.<br>
+이 식들의 총 계산 결과는 dCo/d해당 은닉층을 나타내지만 안의 내용물이 다른데 당연히 계산 결과가 다를것 같았습니다.<br>
+애초에 아무리 미분 기호가 담긴 식이 분수 형태로 약분이 된다고는 하지만, 이게 
+확인을 위해 재귀함수를 호출할때 보내는 값의 의미를 나타내는 문자열을 표시하게 했습니다.<br>
+```python
+sys=mlp.nsystem()
+layer=sys.CreateLayer(4,2) #층이 4개
+sys.CreateNeurons(4, layer[1], mlp.ReLU, 1) #1번 레이어는 입력, 2번 레이어는 ReLU
+sys.CreateNeurons(4, layer[2], mlp.ReLU, 1) #3번 레이어도 ReLU
+sys.CreateNeurons(2, layer[3], mlp.Sigmoid, 1) #마지막 4번은 Sigmoid
+
+sys.feed([0.3,0.3])
+sys.Activate()
+result=[0.9,0.9]
+for i, n in enumerate(sys.out().children):
+    n.descback(predict=result[i])
+```
+```python
+def descback(self, **kwargs):
+  if t is None:
+        temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) 
+        str+=f"(dCo/dZ{self.layer.index}:{self.index})"
+    else:
+        temp=t*self.deltaHZ()
+        str+=f"(dH{self.layer.index}:{self.index}/dZ{self.layer.index}:{self.index})"
+    print(f"{str} => {temp}")
+    for i, n in enumerate(self.layer.ProvidePrevNeu()):
+        provid=temp*self.w[i]
+        sendstr=str
+        sendstr+=f"(dZ{self.layer.index}:{self.index}/dH{n.layer.index}:{n.index})"
+        self.w[i]-=temp*n.sig*0.1
+        n.descback(predict=predict, t=provid, str=sendstr)
+    self.b-=temp*0.1
+```
+```
+(dCo/dZ3:0) => 0.0227924747036237
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0) => 0.0166515536496952
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:0)(dH1:0/dZ1:0) => 0.0114297530746209
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:1)(dH1:1/dZ1:1) => 0.0128708240028593
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:2)(dH1:2/dZ1:2) => 0.0121948226256797
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:3)(dH1:3/dZ1:3) => 0.0147195158535989
+(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1) => 0.0207492358169774
+(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:0)(dH1:0/dZ1:0) => 0.0155725578720509
+(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:1)(dH1:1/dZ1:1) => 0.0105325002288606
+(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:2)(dH1:2/dZ1:2) => 0.0189852180495419
+(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:3)(dH1:3/dZ1:3) => 0.0147849574497214
+(dCo/dZ3:0)(dZ3:0/dH2:2)(dH2:2/dZ2:2) => 0.0129690523241637
+(dCo/dZ3:0)(dZ3:0/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:0)(dH1:0/dZ1:0) => 0.00903188234300677
+(dCo/dZ3:0)(dZ3:0/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:1)(dH1:1/dZ1:1) => 0.0120503450057629
+(dCo/dZ3:0)(dZ3:0/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:2)(dH1:2/dZ1:2) => 0.0116958163057677
+(dCo/dZ3:0)(dZ3:0/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:3)(dH1:3/dZ1:3) => 0.00801058826769267
+(dCo/dZ3:0)(dZ3:0/dH2:3)(dH2:3/dZ2:3) => 0.0153999646687269
+(dCo/dZ3:0)(dZ3:0/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:0)(dH1:0/dZ1:0) => 0.00823117352727845
+(dCo/dZ3:0)(dZ3:0/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:1)(dH1:1/dZ1:1) => 0.0125298028187108
+(dCo/dZ3:0)(dZ3:0/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:2)(dH1:2/dZ1:2) => 0.0134852463814999
+(dCo/dZ3:0)(dZ3:0/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:3)(dH1:3/dZ1:3) => 0.00838235072363132
+(dCo/dZ3:1) => 0.0128994383705544
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0) => 0.0124624423188130
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:0)(dH1:0/dZ1:0) => 0.00854461781782720
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:1)(dH1:1/dZ1:1) => 0.00962637884882033
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:2)(dH1:2/dZ1:2) => 0.00911684407466581
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:3)(dH1:3/dZ1:3) => 0.0110079273742798
+(dCo/dZ3:1)(dZ3:1/dH2:1)(dH2:1/dZ2:1) => 0.0122345996371487
+(dCo/dZ3:1)(dZ3:1/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:0)(dH1:0/dZ1:0) => 0.00917035537819763
+(dCo/dZ3:1)(dZ3:1/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:1)(dH1:1/dZ1:1) => 0.00620247876434274
+(dCo/dZ3:1)(dZ3:1/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:2)(dH1:2/dZ1:2) => 0.0111821457184559
+(dCo/dZ3:1)(dZ3:1/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:3)(dH1:3/dZ1:3) => 0.00870738296060343
+(dCo/dZ3:1)(dZ3:1/dH2:2)(dH2:2/dZ2:2) => 0.00982443362228274
+(dCo/dZ3:1)(dZ3:1/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:0)(dH1:0/dZ1:0) => 0.00683595902156630
+(dCo/dZ3:1)(dZ3:1/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:1)(dH1:1/dZ1:1) => 0.00912451358941298
+(dCo/dZ3:1)(dZ3:1/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:2)(dH1:2/dZ1:2) => 0.00885373849834112
+(dCo/dZ3:1)(dZ3:1/dH2:2)(dH2:2/dZ2:2)(dZ2:2/dH1:3)(dH1:3/dZ1:3) => 0.00606301636967874
+(dCo/dZ3:1)(dZ3:1/dH2:3)(dH2:3/dZ2:3) => 0.00879155920609353
+(dCo/dZ3:1)(dZ3:1/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:0)(dH1:0/dZ1:0) => 0.00469270020610435
+(dCo/dZ3:1)(dZ3:1/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:1)(dH1:1/dZ1:1) => 0.00714881485415029
+(dCo/dZ3:1)(dZ3:1/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:2)(dH1:2/dZ1:2) => 0.00769191256171703
+(dCo/dZ3:1)(dZ3:1/dH2:3)(dH2:3/dZ2:3)(dZ2:3/dH1:3)(dH1:3/dZ1:3) => 0.00477976667108846
+```
+이 결과에서 Z와 H 뒤에 붙는 3:1, 2:1 같은 애들은 (레이어의 인덱스):(레이어 내 인덱스)를 가르킵니다.<br> 
+3:1의 경우 4번째 레이어의 2번째 뉴런(배열의 index는 0부터 시작하니까), 2:0은 3번째 층의 1번째 뉴런을 얘기합니다.<br>
+지금 알아야 할 것은 2번째 층에 있는 뉴런들의 기울기가 제대로 계산이 되는것임. <br>
+```
+(dCo/dZ3:0) => 0.0227924747036237
+```
+아까 4개의 층을 생성하기로 설정했으로 dZ3:0은 출력층의 1번째 뉴런을 가르킵니다.<br>
+이를 비용함수에 대해 편미분한 결과입니다.
+```
+(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0) => 0.0166515536496952
+(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0) => 0.0124624423188130
+```
+각각 비용함수를 Z2:0에 대해 편미분한 결과입니다.
+이 둘을 합치면 Z2:0에 대한 비용함수의 기울기가 되는것은 알고있는데...
+

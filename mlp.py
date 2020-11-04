@@ -37,7 +37,7 @@ class nsystem:
     def Activate(self):
         for l in self.children:
             l.ActivateLayer()
-    def CreateLayer(self, number, inputSize):
+    def CreateLayer(self, number=1, inputSize=1):
         layer=[]
         for i in range(number):
             layer.append(self.Add())
@@ -142,6 +142,37 @@ class nneuron:
             self.w[i]-=temp*n.sig*0.1
             n.back(predict=predict, t=provid)
         self.b-=temp*0.1
+    def descback(self, **kwargs):
+        if self.layer.index<=0: return 0
+        temp=0
+        t=None
+        predict=None
+        str=""
+        for key, value in kwargs.items():
+            if key=="predict": 
+                predict=value
+            elif key=="t": 
+                t=value
+            elif key=="str":
+                str=value
+        if predict is None: return -1 
+
+
+
+        if t is None:
+            temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) 
+            str+=f"(dCo/dZ{self.layer.index}:{self.index})"
+        else:
+            temp=t*self.deltaHZ()
+            str+=f"(dH{self.layer.index}:{self.index}/dZ{self.layer.index}:{self.index})"
+        print(f"{str} => {temp}")
+        for i, n in enumerate(self.layer.ProvidePrevNeu()):
+            provid=temp*self.w[i]
+            sendstr=str
+            sendstr+=f"(dZ{self.layer.index}:{self.index}/dH{n.layer.index}:{n.index})"
+            self.w[i]-=temp*n.sig*0.1
+            n.descback(predict=predict, t=provid, str=sendstr)
+        self.b-=temp*0.1
     def ToString(self):
         return f'  ({self.index})sig:{self.sig} weights:{self.w} bias:{self.b}'
     def ToStringOnlySig(self):
@@ -156,35 +187,3 @@ def train(sys, inputData, result):
     #print(f'{inputData} -> Precdiction: {result} Predict:{sys.evaluate(result)}')
     for i, n in enumerate(sys.out().children):
         n.back(predict=result[i])
-    
-
-sys=nsystem()
-layer=sys.CreateLayer(3,2)
-sys.CreateNeurons(4, layer[1], ReLU, 1)
-sys.CreateNeurons(1, layer[2], Sigmoid, 1)
-
-cnt1=0
-cnt2=0
-for i in range(1000):
-    rand = random.choice((0,1))
-    
-    if rand==0:
-        train(sys, [random.uniform(0.01,0.3),random.uniform(0.01,0.3)], [0.01])
-        cnt1+=1
-    else:
-        train(sys, [random.uniform(0.8,0.99),random.uniform(0.8,0.99)], [0.99])
-        cnt2+=1
-    
-    if i%10==0: 
-        sys.fastfeed([1,1])
-        print(f"train for 0 -> {cnt1} / 1 -> {cnt2}")
-        print(f"evaluates for [1,1] {sys.evaluate([1])}")
-        sys.fastfeed([0.1,0.1])
-        print(f"evaluates for [0.1,0.1] {sys.evaluate([0])}")
-
-print(sys.fastfeed([0.5,0.5]))
-print(sys.fastfeed([0.1,0.1]))
-print(sys.fastfeed([0.9,0.9]))
-print(sys.fastfeed([0,1]))
-print(sys.fastfeed([33,33]))
-print(sys.ToString())
