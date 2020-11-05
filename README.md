@@ -303,26 +303,31 @@ temp=t*self.deltaHZ()
 그래서 구해보았는데 층을 나타내는 숫자 위치의 표기를 잘못 표기했음을 다 쓰고 나서 눈치챘습니다. ㅠ<br>
 h1은 출력층 가장 가까이 있는 은닉층의 첫번째 놈이고 h^2_1 (상단에 2, 아래에 1)은 출력층에서 2번째로 먼 은닉층의 첫번째 놈을 얘기합니다. 원래대로면 반대입니다..<br>
 Co -> O1, O2, O3... -> h1, h2, h3 ... -> h^2_1, h^2_2 ... 
+### 최하위 은닉층
 ![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)<br>
 위 식의 결과는 첫번째 은닉층에 대한 비용함수의 미분 결과를 나타냅니다 <br>
 여기까지는 별 무리가 없지만 그 다음 더 깊은 은닉층을 구할때 식 자체는 같은데.. 결과가 다를것 같은 놈이 생깁니다<br>
 ![render-3](https://user-images.githubusercontent.com/21963949/98175726-7f587580-1f3a-11eb-84b7-8cd042906837.png)<br>
-![render-2](https://user-images.githubusercontent.com/21963949/98175737-841d2980-1f3a-11eb-8493-0b3aaa4f4a1b.png)<br>
 Z 함수는 필터를 거치기 전 이전 레이어에서의 총 계산 결과입니다.<br>
+![render-2](https://user-images.githubusercontent.com/21963949/98175737-841d2980-1f3a-11eb-8493-0b3aaa4f4a1b.png)<br>
 이 식들의 총 계산 결과는 dCo/d해당 은닉층을 나타내지만 안의 내용물이 다른데 당연히 계산 결과가 다를것 같았습니다.<br>
 그러면 여기서도 비용함수처럼 항을 나눠서 계산을 해야되는것 같은데... 잘 안와닿았습니다 <br>
 ![img-a5905af106576669](https://user-images.githubusercontent.com/21963949/98206628-8f457900-1f7d-11eb-9e71-bc07efc90177.jpg)<br>
-딱봐도 이 식을 적용하는것 같고 h1과 h2는 h^2_1을 가지고 있는게 확실하기 때문에 이렇게 하는게 맞을것 같지만 너무 찝찝해서 한번 짚어보려구 합니다.<br>
-![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)
-먼저 당연하게 받아들일수 있었던 이 식을 먼저 확인해보았습니다. 
-![img-e842610b37aca997](https://user-images.githubusercontent.com/21963949/98206611-8c4a8880-1f7d-11eb-8c6a-09a5776fca1d.jpg)일때 연쇄 법칙과 편미분을 사용해서 dz/dt를 구할수 있습니다. (https://suhak.tistory.com/909)
+딱봐도 이 식을 적용하는것 같고 h1과 h2는 h^2_1을 가지고 있는게 확실하기 때문에 이렇게 하는게 맞을것 같지만 너무 찝찝해서 한번 짚어보려구 합니다<br>
+### 최하위 은닉층의 기울기
+![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)<br>
+먼저 당연하게 받아들일수 있었던 이 식을 먼저 확인해보았습니다. <br>
+![img-e842610b37aca997](https://user-images.githubusercontent.com/21963949/98206611-8c4a8880-1f7d-11eb-8c6a-09a5776fca1d.jpg)일때 연쇄 법칙과 편미분을 사용해서 dz/dt를 구할수 있습니다. [출처](https://suhak.tistory.com/909)<br>
 ![img-34b9c84b1418b130](https://user-images.githubusercontent.com/21963949/98206610-8bb1f200-1f7d-11eb-8203-fbb676e441bd.jpg)<br>
+이런 느낌으로 비용함수에 대한 h1의 기울기에 접근해 보려고 합니다.<br>
 ![img-a0e2d089ee39e454](https://user-images.githubusercontent.com/21963949/98206626-8f457900-1f7d-11eb-8a8a-901273e9802d.jpg)<br>
 비용함수가 O1, O2, O3에 대한 식으로 이루어져 있고 그 식들은 h1을 담고 있어서 이런 결과가 나온게 확실히 보입니다.<br>
-그러면 비용함수 편미분 결과는 은닉층 갯수만큼 얻을수 있습니다.<br>
+이렇게 해서 은닉층 갯수만큼 편미분의 결과를 얻을수 있습니다.<br>
 ![img-bbb51acca0f7b385](https://user-images.githubusercontent.com/21963949/98206624-8eace280-1f7d-11eb-8260-a080dbdc2812.jpg)<br>
-즉 이 뜻은 비용함수를 까고 까고 깠을때 나머지를 상수 취급하면 img-0a56 처럼 h1, h2, h3의 문자들로만 나타내지는 다변수 함수임을 얘기하는것입니다. <br> 
-결국 그럼 h1, h2, h3는 하위 은닉층인 h^2_1을 가지고 있기 때문에 다음과 같이 정리됩니다.<br>
+즉 이 뜻은 비용함수를 까고 까고 깠을때 나머지를 상수 취급하면<br>
+![img-0a5689d1c045a59d](https://user-images.githubusercontent.com/21963949/98206623-8e144c00-1f7d-11eb-9b27-baaa1c182ddd.jpg)<br>
+처럼 h1, h2, h3의 문자들로만 나타내지는 다변수 함수가 됩니다.<br> 
+결국 그럼 h1, h2, h3는 하위 은닉층인 h^2_1에 영향을 받기 때문에 다음과 같이 정리됩니다.<br>
 ![img-33114dd84ab71333](https://user-images.githubusercontent.com/21963949/98206621-8e144c00-1f7d-11eb-93b9-fa2f203cf517.jpg)<br>
 이때 f는 Co함수의 동작을 가르킵니다. 그러면 h^2_1에 대한 편미분이 가능해졌습니다.<br>
 ![img-632e2828905f199f](https://user-images.githubusercontent.com/21963949/98206619-8d7bb580-1f7d-11eb-8eb8-ab784dc2f77e.jpg)<br>
