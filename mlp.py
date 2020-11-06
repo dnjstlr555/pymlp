@@ -157,8 +157,6 @@ class nneuron:
                 str=value
         if predict is None: return -1 
 
-
-
         if t is None:
             temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) 
             str+=f"(dCo/dZ{self.layer.index}:{self.index})"

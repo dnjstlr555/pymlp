@@ -299,9 +299,9 @@ def back(self, **kwargs):
 ```python
 temp=t*self.deltaHZ()
 ```
-전체 비용함수에 대한 미분 결과를 구해야 했는데, 식 검증 과정에서 무언가 놓친게 있는것 같았습니다. <br>
-그래서 구해보았는데 층을 나타내는 숫자 위치의 표기를 잘못 표기했음을 다 쓰고 나서 눈치챘습니다. ㅠ<br>
-h1은 출력층 가장 가까이 있는 은닉층의 첫번째 놈이고 h^2_1 (상단에 2, 아래에 1)은 출력층에서 2번째로 먼 은닉층의 첫번째 놈을 얘기합니다. 원래대로면 반대입니다..<br>
+전체 비용함수에 대한 미분 결과를 구해야 했는데, 식 검증 과정에서 무언가 놓친게 있는것 같음<br>
+그래서 구해보았는데 층을 나타내는 숫자 위치의 표기를 잘못 표기했음을 다 쓰고 나서 알게되었습니다 ...<br>
+h1은 출력층 가장 가까이 있는 은닉층의 첫번째 놈이고 h^2_1 (상단에 2, 아래에 1)은 출력층에서 2번째로 먼 은닉층의 첫번째 놈을 얘기합니다.<br>
 Co -> O1, O2, O3... -> h1, h2, h3 ... -> h^2_1, h^2_2 ... 
 ### 최하위 은닉층
 ![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)<br>
@@ -314,12 +314,13 @@ Z 함수는 필터를 거치기 전 이전 레이어에서의 총 계산 결과�
 그러면 여기서도 비용함수처럼 항을 나눠서 계산을 해야되는것 같은데... 잘 안와닿았습니다 <br>
 ![img-a5905af106576669](https://user-images.githubusercontent.com/21963949/98206628-8f457900-1f7d-11eb-9e71-bc07efc90177.jpg)<br>
 딱봐도 이 식을 적용하는것 같고 h1과 h2는 h^2_1을 가지고 있는게 확실하기 때문에 이렇게 하는게 맞을것 같지만 너무 찝찝해서 한번 짚어보려구 합니다<br>
-### 최하위 은닉층의 기울기
-![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)<br>
-먼저 당연하게 받아들일수 있었던 이 식을 먼저 확인해보았습니다. <br>
+### 다변수 함수의 미분
 ![img-e842610b37aca997](https://user-images.githubusercontent.com/21963949/98206611-8c4a8880-1f7d-11eb-8c6a-09a5776fca1d.jpg)일때 연쇄 법칙과 편미분을 사용해서 dz/dt를 구할수 있습니다. [출처](https://suhak.tistory.com/909)<br>
 ![img-34b9c84b1418b130](https://user-images.githubusercontent.com/21963949/98206610-8bb1f200-1f7d-11eb-8203-fbb676e441bd.jpg)<br>
 이런 느낌으로 비용함수에 대한 h1의 기울기에 접근해 보려고 합니다.<br>
+### 최하위 은닉층의 기울기
+![render](https://user-images.githubusercontent.com/21963949/98175743-87181a00-1f3a-11eb-99b5-bde6bde21a30.png)<br>
+먼저 당연하게 받아들일수 있었던 이 식을 먼저 확인해보았습니다. <br>
 ![img-a0e2d089ee39e454](https://user-images.githubusercontent.com/21963949/98206626-8f457900-1f7d-11eb-8a8a-901273e9802d.jpg)<br>
 비용함수가 O1, O2, O3에 대한 식으로 이루어져 있고 그 식들은 h1을 담고 있어서 이런 결과가 나온게 확실히 보입니다.<br>
 이렇게 해서 은닉층 갯수만큼 편미분의 결과를 얻을수 있습니다.<br>
@@ -332,63 +333,92 @@ Z 함수는 필터를 거치기 전 이전 레이어에서의 총 계산 결과�
 이때 f는 Co함수의 동작을 가르킵니다. 그러면 h^2_1에 대한 편미분이 가능해졌습니다.<br>
 ![img-632e2828905f199f](https://user-images.githubusercontent.com/21963949/98206619-8d7bb580-1f7d-11eb-8eb8-ab784dc2f77e.jpg)<br>
 ![img-5a288f2636b6ac24](https://user-images.githubusercontent.com/21963949/98206613-8ce31f00-1f7d-11eb-89f9-71a7abbbb319.jpg)<br>
-비용함수에 대한 h1, h2, h3들의 미분값은 미리 계산이 되어있고 h1/h^2_1, h2/h^2_1 등은 쉽게 구할수 있습니다. <br>이렇게 은닉층 뒤 은닉층의 비용함수 기울기를 검증할 수 있었습니다.<br>그 다음 은닉층의 경우 같은 방법으로 구하면 됩니다.<br>
+비용함수에 대한 h1, h2, h3들의 미분값은 미리 계산이 되어있고 h1/h^2_1, h2/h^2_1 등은 쉽게 구할수 있습니다. <br>이렇게 은닉층 뒤 은닉층의 비용함수 기울기를 검증할 수 있었습니다.<br>그 다음 은닉층의 경우 같은 방법으로 구하면 될거 같습니다.<br>
 ![img-bad6e218809b8817](https://user-images.githubusercontent.com/21963949/98206607-894f9800-1f7d-11eb-8ac1-b11c0311eef1.jpg)<br>
-확인을 위해 재귀함수를 호출할때 보내는 값의 의미를 나타내는 문자열을 표시하게 했습니다.<br>
+## 알고리즘 확인
+식에 따르면 이전 레이어의 모든 연산이 완료되고 정보가 제공되어야 하지만 분배 법칙에 의해 따로따로 적용시켜도 괜찮을것 같아서 확인해 보았습니다.<br>
+경사하강법에 의해 가중치를 업데이트 하는 식은 아래와 같습니다.<br>
+![img-bad6e218809b8817](https://user-images.githubusercontent.com/21963949/98356230-9b593580-2066-11eb-8b1f-7845db2a5b97.jpg)
+<br>
+h^2_1의 h^3_1에 대한 가중치 업데이트 식은 이러합니다.<br>
+![img-75756add0e1ddbed](https://user-images.githubusercontent.com/21963949/98356227-9ac09f00-2066-11eb-867b-e10448a314bc.jpg)<br>
+이때 알파는 학습률을 나타내는 상수이고 (w)h2:1->h3:1은 h3:1에서 받아오는 출력값에 곱해주는 가중치를 나타냅니다.<br>
+이걸 풀어보면 <br>
+![img-a38e65818a04aa87](https://user-images.githubusercontent.com/21963949/98356222-9ac09f00-2066-11eb-9455-a51c4a576630.jpg)<br>
+이런 결과가 나오는데, (1)번 애들은 바로 이전단계 정보만 잇으면 구할수 있습니다.<br>
+비용함수에 대한 미분의 경우 방금 검증한 내용을 토대로<br>
+![img-e4186dfb52dc0377](https://user-images.githubusercontent.com/21963949/98356216-98f6db80-2066-11eb-96c4-798cd2c26187.png)<br>
+이렇게 정리할 수 있습니다.<br>
+다른 층에 대해서도 정리를 해보면 <br>
+![img-d6b9de2728c0fd0f](https://user-images.githubusercontent.com/21963949/98356221-9a280880-2066-11eb-8cc9-3cfa39051e43.png)<br>
+같은 결과가 나옵니다.<br>
+1번식의 경우 출력층에서 일어나는 연산으로써 h1이 사용할 기울기를 제공하는데 사용됩니다. <br>
+2번식은 바로 앞의 층의 모든 계산 결과를 사용합니다. 3번식은 더 깊은 층의 기울기인데 비슷한 형태의 계산이 반복되서 더해집니다. 
+## 재귀함수
+재귀함수 특성상 구할수 있는 정보가 자신의 정보만으로 제한돼 있습니다. 다만 다음 노드에 대한 재귀함수를 호출할때 거기다 정보를 담을 수 있습니다.<br>
+그리고 O1->O2->O3.. 순이 아니라 O1->h1->h^2_1->h^2_2... 같이 뿌리내리는 모양으로 호출이 됩니다. 이 점을 염두해 두고 한번 확인해 보겠습니다.<br>
+시그마 형태로 나타내면<br>
+![img-a59b7cd88f7fb34f](https://user-images.githubusercontent.com/21963949/98356210-95fbeb00-2066-11eb-91f7-46ba162d5149.png)<br>
+이렇게 나타낼 수 있습니다. 이 식들은 전전식의 항의 형태를 알려줍니다.<br>
+2번 식에서 오른쪽 계수는 이전 노드들의 정보가 있어야 하구 왼쪽 계수는 더 거슬러 올라가 비용함수 정보를 필요로 합니다.<br>
+3번 식은 2번식에 비슷한 형태로 오른쪽 계수가 추가되었습니다.<br>
+재귀함수는 똑같은 노드에 대해 다시 실행되지 않고 식에서 필요로 하는 모든 정보는 다 한번씩 가지를 내려오면서 얻을 수 있는 정보입니다. 
+## 코드 작성
+파이썬 느낌의 의사 코드로 알고리즘을 작성해 보겠습니다.
 ```python
-sys=mlp.nsystem()
-layer=sys.CreateLayer(4,2) #층이 4개
-sys.CreateNeurons(4, layer[1], mlp.ReLU, 1) #1번 레이어는 입력, 2번 레이어는 ReLU
-sys.CreateNeurons(4, layer[2], mlp.ReLU, 1) #3번 레이어도 ReLU
-sys.CreateNeurons(2, layer[3], mlp.Sigmoid, 1) #마지막 4번은 Sigmoid
-
-sys.feed([0.3,0.3])
-sys.Activate()
-result=[0.9,0.9]
-for i, n in enumerate(sys.out().children):
-    n.descback(predict=result[i])
+def back(self, t):
+  if self.layer is last:
+    dt=(dCo/dself)
+  else:
+    dt=t
+  self.b=self.b - dt*(dself/d{self.b})
+  for neuron in nextLayer.neurons:
+    self.w[neuron]=self.w[neuron] - dt*(dself/d{self.w[neuron]})
+    provide=dt*(dself/d{neuron})
+    neuron.back(provide)
 ```
+아래는 진짜 코드입니다.
 ```python
-def descback(self, **kwargs):
-  if t is None:
-        temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) 
-        str+=f"(dCo/dZ{self.layer.index}:{self.index})"
-    else:
-        temp=t*self.deltaHZ()
-        str+=f"(dH{self.layer.index}:{self.index}/dZ{self.layer.index}:{self.index})"
-    print(f"{str} => {temp}")
-    for i, n in enumerate(self.layer.ProvidePrevNeu()):
-        provid=temp*self.w[i]
-        sendstr=str
-        sendstr+=f"(dZ{self.layer.index}:{self.index}/dH{n.layer.index}:{n.index})"
-        self.w[i]-=temp*n.sig*0.1
-        n.descback(predict=predict, t=provid, str=sendstr)
-    self.b-=temp*0.1
+def ActDiff(self):
+  return sympy.diff(self.f)
+def Z(self):
+  prev=self.layer.ProvidePrevSig()
+  sum=0
+  for i, p in enumerate(prev):
+    sum+=self.w[i]*p
+  return sum+self.b
+def diffSigZ(self):
+  return (self.ActDiff().subs(x,self.Z()))
+def back(self, **kwargs):
+  t=kwargs.get("t")
+  train=kwargs.get("trainData")
+  if train==None:
+    return -1 
+  if t==None:
+    dt=(2/len(self.layer.children))*(self.sig-train)
+  else:
+    dt=t
+  for i, neuron in enumerate(self.layer.ProvidePrevNeu()):
+    provide=dt*self.diffSigZ()*self.w[i]
+    neuron.back(t=provide, trainData=train)
+    self.w[i]=self.w[i] - dt*self.diffSigZ()*neuron.sig*0.1
+  self.b=self.b - dt*self.diffSigZ()*0.1
 ```
+## 원본 식과의 차이
+### back 함수
+```python
+if t is None:
+  temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ())
+else:
+  temp=t*self.deltaHZ()  
+for i, n in enumerate(self.layer.ProvidePrevNeu()):
+  provid=temp*self.w[i]
+  self.w[i]-=temp*n.sig*0.1
+  n.back(predict=predict, t=provid)
+self.b-=temp*0.1
 ```
-(dCo/dZ3:0) => 0.0227924747036237
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0) => 0.0166515536496952
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:0)(dH1:0/dZ1:0) => 0.0114297530746209
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:1)(dH1:1/dZ1:1) => 0.0128708240028593
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:2)(dH1:2/dZ1:2) => 0.0121948226256797
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0)(dZ2:0/dH1:3)(dH1:3/dZ1:3) => 0.0147195158535989
-(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1) => 0.0207492358169774
-(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:0)(dH1:0/dZ1:0) => 0.0155725578720509
-(dCo/dZ3:0)(dZ3:0/dH2:1)(dH2:1/dZ2:1)(dZ2:1/dH1:1)(dH1:1/dZ1:1) => 0.0105325002288606
+다른게 없다. w[i]의 적용 순서를 다르게 했습니다. 바뀐 w[i]를 보내주는것보다 기존 w[i]를 보내주는게 맞을것 같은데 이건 또 나중에 확인해 보겠음<br>
+식에 근본적인 문제가 있는줄 알았는데 그게 아니라 다른곳에서 문제가 생긴 모양입니다..
+## 결론
+편미분의 기호와 일반 델타 기호의 차이점을 잘 모르고 처음엔 막썼는데 계산하다 보니까 확실히 알게 되었다. <br>
 
-...
-
-```
-이 결과에서 Z와 H 뒤에 붙는 3:1, 2:1 같은 애들은 (레이어의 인덱스):(레이어 내 인덱스)를 가르킵니다.<br> 
-3:1의 경우 4번째 레이어의 2번째 뉴런(배열의 index는 0부터 시작하니까), 2:0은 3번째 층의 1번째 뉴런을 얘기합니다.<br>
-지금 알아야 할 것은 2번째 층에 있는 뉴런들의 기울기가 제대로 계산이 되는거 <br>
-```
-(dCo/dZ3:0) => 0.0227924747036237
-```
-아까 4개의 층을 생성하기로 설정했으로 dZ3:0은 출력층의 1번째 뉴런을 가르킵니다.<br>
-이를 비용함수에 대해 편미분한 결과입니다.
-```
-(dCo/dZ3:0)(dZ3:0/dH2:0)(dH2:0/dZ2:0) => 0.0166515536496952
-(dCo/dZ3:1)(dZ3:1/dH2:0)(dH2:0/dZ2:0) => 0.0124624423188130
-```
-각각 비용함수를 Z2:0에 대해 편미분한 결과입니다.<br>
