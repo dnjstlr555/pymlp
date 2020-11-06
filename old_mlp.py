@@ -111,35 +111,66 @@ class nneuron:
     def ActivateEach(self):
         self.sig=0
         #ft=sympy.lambdify(x, self.f, np)
-        self.sig=self.f.subs(x, self.Z()) 
-    def ActDiff(self):
-        return sympy.diff(self.f)
-    def Z(self):
-        prev=self.layer.ProvidePrevSig()
-        sum=0
-        for i, p in enumerate(prev):
-            if self.w[i]==None:
+        self.sig=self.f.subs(x, self.ProvideZ()) 
+    def ProvideZ(self):
+        prevSig=self.layer.ProvidePrevSig()
+        providz=0
+        for i, sig in enumerate(prevSig):
+            if self.w[i] is None:
                 self.w[i]=random.uniform(0.5,1)
-            sum+=self.w[i]*p
-        return sum+self.b
-    def diffSigZ(self):
-        return (self.ActDiff().subs(x,self.Z()))
+            providz+=self.w[i]*sig
+        return providz+self.b
+    def deltaHZ(self):
+        return sympy.diff(self.f).subs(x,self.ProvideZ())
     def back(self, **kwargs):
-        if self.layer.index<=1:
-            return
-        t=kwargs.get("t")
-        train=kwargs.get("trainData")
-        if train==None:
-            return -1 
-        if t==None:
-            dt=(2/len(self.layer.children))*(self.sig-train)
+        if self.layer.index<=0: return 0
+        temp=0
+        t=None
+        predict=[]
+        for key, value in kwargs.items():
+            if key=="predict": 
+                predict=value
+            elif key=="t": 
+                t=value
+        if predict is None: return -1      
+        if t is None:
+            temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ())
         else:
-            dt=t
-        for i, neuron in enumerate(self.layer.ProvidePrevNeu()):
-            provide=dt*self.diffSigZ()*self.w[i]
-            neuron.back(t=provide, trainData=train)
-            self.w[i]=self.w[i] - dt*self.diffSigZ()*neuron.sig*0.1
-        self.b=self.b - dt*self.diffSigZ()*0.1
+            temp=t*self.deltaHZ()  
+        for i, n in enumerate(self.layer.ProvidePrevNeu()):
+            provid=temp*self.w[i]
+            self.w[i]-=temp*n.sig*0.1
+            n.back(predict=predict, t=provid)
+        self.b-=temp*0.1
+    def descback(self, **kwargs):
+        if self.layer.index<=0: return 0
+        temp=0
+        t=None
+        predict=None
+        str=""
+        for key, value in kwargs.items():
+            if key=="predict": 
+                predict=value
+            elif key=="t": 
+                t=value
+            elif key=="str":
+                str=value
+        if predict is None: return -1 
+
+        if t is None:
+            temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ()) 
+            str+=f"(dCo/dZ{self.layer.index}:{self.index})"
+        else:
+            temp=t*self.deltaHZ()
+            str+=f"(dH{self.layer.index}:{self.index}/dZ{self.layer.index}:{self.index})"
+        print(f"{str} => {temp}")
+        for i, n in enumerate(self.layer.ProvidePrevNeu()):
+            provid=temp*self.w[i]
+            sendstr=str
+            sendstr+=f"(dZ{self.layer.index}:{self.index}/dH{n.layer.index}:{n.index})"
+            self.w[i]-=temp*n.sig*0.1
+            n.descback(predict=predict, t=provid, str=sendstr)
+        self.b-=temp*0.1
     def ToString(self):
         return f'  ({self.index})sig:{self.sig} weights:{self.w} bias:{self.b}'
     def ToStringOnlySig(self):
@@ -153,4 +184,4 @@ def train(sys, inputData, result):
     sys.Activate()
     #print(f'{inputData} -> Precdiction: {result} Predict:{sys.evaluate(result)}')
     for i, n in enumerate(sys.out().children):
-        n.back(trainData=result[i])
+        n.back(predict=result[i])

@@ -340,6 +340,7 @@ Z 함수는 필터를 거치기 전 이전 레이어에서의 총 계산 결과�
 경사하강법에 의해 가중치를 업데이트 하는 식은 아래와 같습니다.<br>
 ![img-bad6e218809b8817](https://user-images.githubusercontent.com/21963949/98356230-9b593580-2066-11eb-8b1f-7845db2a5b97.jpg)
 <br>
+
 h^2_1의 h^3_1에 대한 가중치 업데이트 식은 이러합니다.<br>
 ![img-75756add0e1ddbed](https://user-images.githubusercontent.com/21963949/98356227-9ac09f00-2066-11eb-867b-e10448a314bc.jpg)<br>
 이때 알파는 학습률을 나타내는 상수이고 (w)h2:1->h3:1은 h3:1에서 받아오는 출력값에 곱해주는 가중치를 나타냅니다.<br>
@@ -390,22 +391,61 @@ def Z(self):
 def diffSigZ(self):
   return (self.ActDiff().subs(x,self.Z()))
 def back(self, **kwargs):
+  if self.layer.index<=1:
+      return
   t=kwargs.get("t")
   train=kwargs.get("trainData")
   if train==None:
-    return -1 
+      return -1 
   if t==None:
-    dt=(2/len(self.layer.children))*(self.sig-train)
+      dt=(2/len(self.layer.children))*(self.sig-train)
   else:
-    dt=t
+      dt=t
   for i, neuron in enumerate(self.layer.ProvidePrevNeu()):
-    provide=dt*self.diffSigZ()*self.w[i]
-    neuron.back(t=provide, trainData=train)
-    self.w[i]=self.w[i] - dt*self.diffSigZ()*neuron.sig*0.1
+      provide=dt*self.diffSigZ()*self.w[i]
+      neuron.back(t=provide, trainData=train)
+      self.w[i]=self.w[i] - dt*self.diffSigZ()*neuron.sig*0.1
   self.b=self.b - dt*self.diffSigZ()*0.1
 ```
 ## 원본 식과의 차이
-### back 함수
+먼저 값을 제공하는 함수들의 차이점을 확인해볼게요
+```python
+def ProvideZ(self): #기존
+  prevSig=self.layer.ProvidePrevSig()
+  providz=0
+  for i, sig in enumerate(prevSig):
+      if self.w[i] is None:
+          self.w[i]=random.uniform(0.5,1)
+      providz+=self.w[i]*sig
+  return providz+self.b
+```
+```python
+def Z(self):
+  prev=self.layer.ProvidePrevSig()
+  sum=0
+  for i, p in enumerate(prev):
+      if self.w[i]==None:
+          self.w[i]=random.uniform(0.5,1)
+      sum+=self.w[i]*p
+  return sum+self.b
+```
+크게 다른게 없습니다.
+
+```python
+def deltaHZ(self): #기존
+  return sympy.diff(self.f).subs(x,self.ProvideZ())
+```
+```python
+def ActDiff(self):
+  return sympy.diff(self.f)
+def diffSigZ(self):
+  return (self.ActDiff().subs(x,self.Z()))
+```
+비슷해 보이는 부분이지만 제일 불안한 부분인데 <br>
+sympy 문법이나 사용법이 익숙하지 않아서 이부분을 조금만 건들면 오류가 났었기 때문입니다.<br>
+둘의 차이가 있을까요?<br>
+
+
 ```python
 if t is None:
   temp=2/len(self.layer.children)*(self.sig-predict)*(self.deltaHZ())
@@ -417,8 +457,78 @@ for i, n in enumerate(self.layer.ProvidePrevNeu()):
   n.back(predict=predict, t=provid)
 self.b-=temp*0.1
 ```
-다른게 없다. w[i]의 적용 순서를 다르게 했습니다. 바뀐 w[i]를 보내주는것보다 기존 w[i]를 보내주는게 맞을것 같은데 이건 또 나중에 확인해 보겠음<br>
-식에 근본적인 문제가 있는줄 알았는데 그게 아니라 다른곳에서 문제가 생긴 모양입니다..
+```python
+if t==None:
+  dt=(2/len(self.layer.children))*(self.sig-train)
+else:
+  dt=t
+for i, neuron in enumerate(self.layer.ProvidePrevNeu()):
+  provide=dt*self.diffSigZ()*self.w[i]
+  neuron.back(t=provide, trainData=train)
+  self.w[i]=self.w[i] - dt*self.diffSigZ()*neuron.sig*0.1
+self.b=self.b - dt*self.diffSigZ()*0.1
+```
+사실 별다른게 없습니다. 뭐가 문제였었을까요??<br>
+다만 w[i]의 적용 순서를 다르게 했습니다. 바뀐 w[i]를 보내주는것보다 기존 w[i]를 보내주는게 맞을것 같은데 한번 확인해보겠습니다.<br>
+
+### 순서?
+먼저 w[i]를 수정한 모델의 결과입니다.
+```
+train for 0 -> 0 / 1 -> 1
+evaluates for [1,1] 0.972278245495447
+evaluates for [0.1,0.1] 0.155636759156753
+train for 0 -> 5 / 1 -> 6
+evaluates for [1,1] 0.971560653710321
+evaluates for [0.1,0.1] 0.150932099111381
+train for 0 -> 10 / 1 -> 11
+evaluates for [1,1] 0.970648548890313
+
+...
+
+train for 0 -> 491 / 1 -> 480
+evaluates for [1,1] 0.00750842673013943
+evaluates for [0.1,0.1] 0.0328476299688556
+train for 0 -> 496 / 1 -> 485
+evaluates for [1,1] 0.00752206990583356
+evaluates for [0.1,0.1] 0.0320794762073455
+train for 0 -> 504 / 1 -> 487
+evaluates for [1,1] 0.00811173287592027
+evaluates for [0.1,0.1] 0.0308144292736076
+[0.548688837876099, 0.543857771713573] ([0.5,0.5] 결과)
+[0.184311763879187, 0.166172003929709] ([0.1,0.1] 결과)
+[0.867398768673058, 0.877048240556812] ([0.9,0.9] 결과)
+[0.525312161749080, 0.525961070164471] ([0,1] 결과)
+[1.00000000000000, 1.00000000000000] ([33,33])
+```
+그다음 w[i]를 보내고 수정하는 경우입니다
+```
+train for 0 -> 1 / 1 -> 0
+evaluates for [1,1] 0.968304652942361
+evaluates for [0.1,0.1] 0.157708162416945
+train for 0 -> 3 / 1 -> 8
+evaluates for [1,1] 0.963031348936692
+evaluates for [0.1,0.1] 0.161782493368296
+train for 0 -> 6 / 1 -> 15
+evaluates for [1,1] 0.958688433524327
+evaluates for [0.1,0.1] 0.162906104887089
+
+...
+
+evaluates for [0.1,0.1] 0.0327027136203697
+train for 0 -> 492 / 1 -> 489
+evaluates for [1,1] 0.00681448236954570
+evaluates for [0.1,0.1] 0.0319198793221648
+train for 0 -> 500 / 1 -> 491
+evaluates for [1,1] 0.00746384888933472
+evaluates for [0.1,0.1] 0.0304091667170774
+[0.536795512134298, 0.536039309218853] ([0.5,0.5] 결과)
+[0.173210083952417, 0.167586743191813] ([0.1,0.1] 결과)
+[0.865056965236271, 0.868942781113436] ([0.9,0.9] 결과)
+[0.507855021162558, 0.499870887000164] ([0,1] 결과)
+[1.00000000000000, 1.00000000000000] ([33,33])
+```
+둘의 의미있는 차이점은 보이지 않았습니다. 어짜피 경사하강법의 개념을 생각해 보면 그 값의 크기보다 부호가 더 중요하기 때문인것으로 생각됩니다.<br>
 ## 결론
-편미분의 기호와 일반 델타 기호의 차이점을 잘 모르고 처음엔 막썼는데 계산하다 보니까 확실히 알게 되었다. <br>
+출력층이 한개일때만 작동하는 오류를 수정했습니다. 사실 다른게 없는데 어떻게 해결됬는지.. 차차 분석해 봐야될것같습니다. <br>
+그리고 편미분의 기호와 일반 델타 기호의 차이점을 잘 모르고 처음엔 막썼는데(검증의 최하위 은닉층 파트쪽) 계산하다 보니까 확실히 알게 되었습니다. <br>
 

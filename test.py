@@ -11,4 +11,5 @@ sys.feed([0.3,0.3])
 sys.Activate()
 result=[0.9,0.9]
 for i, n in enumerate(sys.out().children):
-    n.descback(predict=result[i])
+    n.back(predict=result[i])
+print(sys.ToString())
