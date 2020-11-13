@@ -1,5 +1,16 @@
 # pymlp
+```python
+import mlp
+model=mlp.nsystem(inputSize=2)
+model.StackLayer(number=4, function=mlp.ReLU) 
+model.StackLayer(number=1, function=mlp.Sigmoid)
+x=[[0.03, 0.01], [0.9, 0.97]]
+y=[[0], [1]]
+for i, data in enumerate(x):
+  model.train(inputData=data, result=y[i], trainMethod=mlp.Method.GradientDescent, alpha=0.01)
 
+print(model.fastfeed([0.01, 0.01]))
+```
 # 1
 학습 기능 외 구현
 ## nsystem
@@ -529,6 +540,102 @@ evaluates for [0.1,0.1] 0.0304091667170774
 ```
 둘의 의미있는 차이점은 보이지 않았습니다. 어짜피 경사하강법의 개념을 생각해 보면 그 값의 크기보다 부호가 더 중요하기 때문인것으로 생각됩니다.<br>
 ## 결론
-출력층이 한개일때만 작동하는 오류를 수정했습니다. 사실 다른게 없는데 어떻게 해결됬는지.. 차차 분석해 봐야될것같습니다. <br>
+출력층이 한개일때만 작동하는 오류를 수정했습니다. <br>
 그리고 편미분의 기호와 일반 델타 기호의 차이점을 잘 모르고 처음엔 막썼는데(검증의 최하위 은닉층 파트쪽) 계산하다 보니까 확실히 알게 되었습니다. <br>
+# 5
+유전 알고리즘 결합하기
+## 시스템 정비하기
+```python
+import mlp
+model=mlp.nsystem(inputSize=2)
+model.StackLayer(number=4, function=mlp.ReLU) 
+model.StackLayer(number=1, function=mlp.Sigmoid)
+x=[[0.03, 0.01], [0.9, 0.97]]
+y=[[0], [1]]
+for i, data in enumerate(x):
+  model.train(inputData=data, result=y[i], trainMethod=mlp.Method.Genetic, poolSize=10, muchance=0.1)
+  model.train(inputData=data, result=y[i], trainMethod=mlp.Method.GradientDescent, alpha=0.05)
+```
+## 유전 알고리즘
+유전 알고리즘의 가장 큰 장점은 미분 과정이 필요했던 경사 하강법과는 다르게 연산 과정이 별로 없다는것입니다. <br>
+자연 선택의 원리를 따라 적합도가 높은 순서대로 유전자를 합치고 돌연변이 시키고 하는 과정을 계속 반복하면 환경에 적합한 유전자를 찾을 수 있습니다.<br>
+### 만들기
+두 리스트간 교차 알고리즘입니다.
+```python
+@staticmethod
+def cross(x :list, y :list, muchance :float, sigma :float) -> list:
+  if len(x)!=len(y):
+      print(f"Length does not match -> {len(x)} {len(y)}")
+      raise
+  l=len(x)
+  dvid=random.randint(0, l)
+  result=[*x[:dvid], *y[dvid:]]
+  for i, a in enumerate(result):
+      if random.uniform(0, 1) < muchance:
+          result[i]+=random.gauss(0,sigma)
+  return result
+```
+상수들을 유전자로 나타내고 처리하는 알고리즘입니다.
+```python
+size=3 #세대당 모델 개수
+muchance=0.01 #돌연변이 확률
+sigma=1 #돌연변이시 표준편차
+memory=sys.memory #각 세대의 모델들이 담겨있는 장소
+if not memory: #초기 설정시
+    for _ in itertools.repeat(None, size):
+        memory.append({"model":sys.Copy(), "fitness":0}) #sys.Copy()는 스스로를 복제함
+    memory.append({"proto":sys.Copy()})
+proto=[i["proto"] for i in memory if "proto" in i][0] #더미 모델 불러오기
+parentPool=[i for i in memory if "model" in i] 
+maxFit=0
+maxModel=proto
+for m in parentPool:
+    model=m.get("model")
+    if not model:
+        continue
+    fit=model.evaluate(inputData, result)
+    m.update({"fitness":fit}) #적합도 찾기
+    if maxFit<fit:
+        maxFit=fit
+        maxModel=model #적합도가 최대인 모델 불러오기
+if maxModel is not proto:
+    sys.ImportModel(maxModel)
+fTable=[(0 if f.get("fitness") is None else f.get("fitness")) for f in parentPool] #적합도만 불러오기
+p=cls.softmax(fTable) #확률 적용을 위해 0~1 사이의 값으로 나타내기
+childPool=[]
+for _ in itertools.repeat(None, math.floor(3*size/4)):
+    parent=np.random.choice(parentPool, p=p, size=2, replace=True)
+    w=[]
+    b=[]
+    for k in parent:
+        (tw, tb)=cls.GeneticGetTable(k) #해당 모델의 w와 b를 리스트 형ㅌ태로 불러오기
+        if tw is not None and tb is not None:
+            w.append(tw)
+            b.append(tb)
+    childW=cls.cross(w[0], w[1], muchance, sigma) #걔네끼리 교차시키기
+    childB=cls.cross(b[0], b[1], muchance, sigma)
+    child=proto.Copy()
+    child.SetParams(childW, childB) #프로토를 복사하고 파라미터 적용하기
+    childPool.append({"model":child, "fitness":0}) 
+for _ in itertools.repeat(None, math.floor(size/4)):
+    child=proto.Copy()
+    childPool.append({"model":child, "fitness":0}) #나머지는 랜덤 애들로 채우기 
+childPool.append({"proto":proto})
+sys.memory=childPool
+```
+문제는 너무나도 직접 설정해줘야됄 값이 많아져서 적합한 파라미터를 찾는데 시간이 걸릴것 같습니다.
+```
+train for 0 -> 1 / 1 -> 0 / 10
+evaluates for [1,1] 0.872286078486012
+evaluates for [0.1,0.1] 0.0565342490624910
+train for 0 -> 6 / 1 -> 5 / 10
 
+...
+
+train for 0 -> 170 / 1 -> 191 / 10
+evaluates for [1,1] 0.859670959506938
+evaluates for [0.1,0.1] 0.0571793510040143
+train for 0 -> 177 / 1 -> 194 / 10
+evaluates for [1,1] 0.851449563877306
+evaluates for [0.1,0.1] 0.0579993652263276
+```
