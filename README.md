@@ -639,3 +639,203 @@ train for 0 -> 177 / 1 -> 194 / 10
 evaluates for [1,1] 0.851449563877306
 evaluates for [0.1,0.1] 0.0579993652263276
 ```
+# 6
+그러다 아주 중대한 실수를 깨달았습니다. fitness로 저장되는 evaluate 함수는 잘 작동할수록 0에 가까워지는데 그러면 오히려 선택될 확률이 적어집니다.
+```python
+fit=abs(model.evaluate(inputData, result)-1)
+```
+```
+train for 0 -> 189 / 1 -> 222 / 10
+evaluates for [1,1] 0.996959111224677
+evaluates for [0.1,0.1] 0.000765316594234806
+
+...
+
+train for 0 -> 225 / 1 -> 256 / 10
+evaluates for [1,1] 0.996577768254929
+evaluates for [0.1,0.1] 0.00100605509621974
+train for 0 -> 228 / 1 -> 263 / 10
+evaluates for [1,1] 0.995173180277689
+evaluates for [0.1,0.1] 0.00149081716889370
+```
+그런데 오히려 더 나빠졌습니다. 좀더 결과를 찾아본 결과... 새로운 개체를 반환해야 했던 Copy 함수에 문제가 생겼음을 알게되었습니다.<br>
+리스트를 복사하지 않고 그 리스트 변수의 주소를 복사하는 방식이라는 것을 검색 뒤에 알게 되었습니다.<br>
+다만 이 문제를 그냥 해결하기 위해서는 deepcopy라는것을 사용해야 되는데 얘는 너무 세부적인것까지 복사해서 퍼포먼스에 문제가 생기게 되었습니다. 직접 복사 함수를 만들었습니다.<br>
+
+```python
+class nsystem:
+  def Copy(self):
+    p=self.__class__()
+    p.ImportProto(self.Proto())
+    return p
+  def Proto(self):
+    t=[]
+    for l in self.children:
+        t.append(l.Proto())
+    return [t, len(self.children)]
+class nlayer:
+  def Proto(self):
+    sender=[]
+    for n in self.children:
+        (index, f, w, b, sig)=n.Proto()
+        sender.append([index, f, w, b, sig])
+    return [sender, self.index, len(self.children)]
+class nneuron:
+  def Proto(self):
+    return (self.index, self.f, self.w, self.b, self.sig)
+
+...
+
+sys=mlp.nsystem(inputSize=2)
+sys.StackLayer(number=3, function=mlp.ReLU)
+new=sys.Copy()
+new.ImportModel(sys)
+print(f"ImportModel Works:{sys.ToString()==new.ToString()}") # True
+
+```
+계속 유전 알고리즘이 작동 안됬던 이유는 복사한답시고 엉뚱한 모델을 만들었기 때문이었습니다.<br>
+추가적으로 우수 인자를 살리는 비율, 랜덤 인자를 만드는 비율등의 파라미터를 추가하고 학습을 진행했습니다. <br>
+
+```python
+model=mlp.nsystem(inputSize=2)
+model.StackLayer(number=3, function=mlp.ReLU)
+model.StackLayer(number=1, function=mlp.Sigmoid)
+
+
+for i in range(500):
+    rand = random.choice((0,1))
+    if rand==0:
+        model.train([random.uniform(0.7,1),random.uniform(0.7,1)], [1], trainMethod=mlp.Method.Genetic, poolSize=10, muChance=0.05, eliteRatio=0.4, randRatio=0.05)
+    else:
+        model.train([random.uniform(0,0.3),random.uniform(0,0.3)], [0], trainMethod=mlp.Method.Genetic, poolSize=10, muChance=0.05, eliteRatio=0.2, randRatio=0.05)
+    if i%10==0:
+        print(f"{model.evaluate([0,0], [0])} {model.evaluate([0.99,0.99], [1])}")
+
+print(f"{model.fastfeed([0,0])} {model.fastfeed([1,1])}")
+
+```
+```
+0.00215963096408225 0.998134927377352
+0.0000120312150149738 0.999872409190476
+
+...
+
+9.74649021744538E-13 2.67017438916898E-14
+5.95818765302186E-13 1.09122041716011E-14
+1.08920995835101E-11 7.42510829654135E-18
+7.25258549952650E-10 9.70479399094525E-18
+0.0387770371055772 4.33314561650588E-19
+[1.96815132889355e-10] [0.999999652584768] (0,0) (1,1)
+```
+으 드디어 되었습니다. 다만 가끔 값이 튀어서 이상한 쪽으로 학습되기도 합니다.<br>
+
+# 7
+실제 활용
+## 숙제를 해올 확률
+kaggle 검색중에 부모 학력, 시험점수와 숙제를 해온 여부를 정리한 파일이 있어서 한번 시험해볼려고 합니다.<br>
+```python
+import mlp
+import random
+import csv
+import pickle
+
+(male, female) = (0,1)
+(ga, gb, gc, gd, ge) = (0,1,2,3,4)
+(associate, highsch, somecollge, somehighsch, bachelor) = (0,1,2,3,4)
+(standard, reduced) = (0, 1)
+class people:
+    gender=male
+    race=ga
+    pedu=highsch
+    lunch=standard
+    test=0
+    math=75
+    read=75
+    write=75
+    def ToString(self):
+        return f"T:{self.test} gender={self.gender}, race={self.race}, parentalEducation={self.pedu}, lunch={self.lunch}, math={self.math}, read={self.read}, write={self.write}"
+    def ToListOnlyInfo(self):
+        return [self.gender, self.race, self.pedu, self.lunch, self.math, self.read, self.write]
+    def IsTestOkay(self):
+        return self.test
+dataset=[]
+testset=[]
+def converter(row):
+    p=people()
+    if row[0]!="male" and row[0]!="female":
+        return None
+    p.gender=male if row[0]=="male" else female
+    if row[1]=="group A":
+        p.race=ga
+    elif row[1]=="group B":
+        p.race=gb
+    elif row[1]=="group C":
+        p.race=gc
+    elif row[1]=="group D":
+        p.race=gd
+    elif row[1]=="group E":
+        p.race=ge
+    if row[2]=="some college":
+        p.pedu=somecollge
+    elif row[2]=="associate's degree":
+        p.pedu=associate
+    elif row[2]=="high school":
+        p.pedu=highsch
+    elif row[2]=="some high school":
+        p.pedu=somehighsch
+    elif row[2]=="bachelor's degree":
+        p.pedu=bachelor
+    p.lunch=standard if row[3]=="standard" else reduced
+    p.test=0 if row[4]=="none" else 1
+    p.math=int(row[5])
+    p.read=int(row[6])
+    p.write=int(row[7])
+    return p
+with open('train.csv', 'r', encoding='utf-8', newline='') as csvfile:
+    spamreader = csv.reader(csvfile)
+    for row in spamreader:
+        c=converter(row)
+        if c is not None:
+            dataset.append(c)
+model=mlp.nsystem(inputSize=7)
+model.StackLayer(number=8, function=mlp.ReLU)
+model.StackLayer(number=8, function=mlp.ReLU)
+model.StackLayer(number=1, function=mlp.Sigmoid)
+
+random.shuffle(dataset)
+for i, d in enumerate(dataset):
+    model.train(d.ToListOnlyInfo(), [d.IsTestOkay()], trainMethod=mlp.Method.GradientDescent, alpha=0.001)
+f = open('store.pckl', 'wb')
+pro=model.Proto()
+pickle.dump(pro, f)
+f.close()
+```
+학습을 이렇게 처리하고 제 수학과 국어, 평소 점심등을 반영한... 데이터를 모델에 집어넣었습니다.
+```python
+f = open('store.pckl', 'rb')
+obj = pickle.load(f)
+f.close()
+
+model=mlp.nsystem()
+model.ImportProto(obj)
+print(model.ToString())
+
+me=people()
+me.gender=male
+me.race=ga
+me.pedu=bachelor
+me.lunch=standard
+me.math=36
+me.read=72
+me.write=100
+print(model.fastfeed(me.ToListOnlyInfo()))
+```
+
+```
+[8.14014430739655e-2913]
+[7.09567335610614e-2663]
+[2.04331036154889e-2748]
+[2.11505698718984e-2428]
+[2.12103864605446e-3612]
+```
+현재 어떤 값을 집어넣든 거의 0에 가까운 숫자가 나왔습니다. 테스트 하는 학생의 비율이 4:6정도 되어서 그래도 어느정도는 1에 가까울줄 알았는데 문제가 있는것 같아요
