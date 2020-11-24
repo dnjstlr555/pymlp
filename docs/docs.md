@@ -1,17 +1,3 @@
-# pymlp
-```python
-import mlp
-model=mlp.nsystem(inputSize=2)
-model.StackLayer(number=4, function=mlp.ReLU) 
-model.StackLayer(number=1, function=mlp.Sigmoid)
-x=[[0.03, 0.01], [0.9, 0.97]]
-y=[[0], [1]]
-for i, data in enumerate(x):
-  model.train(inputData=data, result=y[i], trainMethod=mlp.Method.GradientDescent, alpha=0.01)
-
-print(model.fastfeed([0.01, 0.01]))
-```
-
 # Model
 ```python
 mlp.nsystem(inputsize=1)
@@ -60,3 +46,33 @@ load model from file<br><br>
 nsystem.ToString()
 ```
 returns a string describing the model<br><br>
+
+# Advance
+```python
+nsystem.Add()
+```
+returns empty layer added into model<br><br>
+```python
+(w,b)=nsystem.GetParams()
+```
+returns w,b table<br><br>
+```python
+nsystem.SetParams(w, b)
+```
+set params.<br><br>
+```python
+nsystem.Proto()
+```
+returns exact copy of model<br><br>
+```python
+nsystem.ImportProto(proto)
+```
+import model from proto<br><br>
+```python
+nsystem.ImportModel(model)
+```
+import model directly from other model<br><br>
+```python
+nlayer.Add(f=mlp.Normal)
+```
+returns added neuron<br><br>

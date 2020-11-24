@@ -85,7 +85,4 @@ for i, d in enumerate(dataset):
             print(model.fastfeed(t.ToListOnlyInfo()))
             count+=1
         print(sum/count)
-f = open('store2.pckl', 'wb')
-pro=model.Proto()
-pickle.dump(pro, f)
-f.close()
+model.save(location='store2.pckl')

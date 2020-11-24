@@ -3,7 +3,7 @@ import numpy as np
 import math
 import sympy
 import itertools
-from copy import deepcopy
+import pickle
 x,y,z= sympy.symbols('x y z') 
 
 class nsystem:
@@ -133,6 +133,16 @@ class nsystem:
         for l in self.children:
             t.append(l.Proto())
         return [t, len(self.children)]
+    def save(self, location='model.pckl'):
+        f = open(location, 'wb')
+        pro=self.Proto()
+        pickle.dump(pro, f)
+        f.close()
+    def load(self, location='model.pckl'):
+        f = open(location, 'rb')
+        obj = pickle.load(f)
+        f.close()
+        self.ImportProto(obj)
     def __reset__(self):
         for l in self.children:
             l.__reset__()
@@ -162,7 +172,7 @@ class nlayer:
             (index, f, w, b, sig)=n.Proto()
             sender.append([index, f, w, b, sig])
         return [sender, self.index, len(self.children)]
-    def Add(self, f):
+    def Add(self, f=Normal):
         newNeu=nneuron(self)
         self.children.append(newNeu)
         newNeu.index=self.children.index(newNeu)

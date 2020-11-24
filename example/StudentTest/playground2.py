@@ -21,12 +21,9 @@ class people:
     def IsTestOkay(self):
         return self.test
 
-f = open('store2.pckl', 'rb')
-obj = pickle.load(f)
-f.close()
 
 model=mlp.nsystem()
-model.ImportProto(obj)
+model.load(location='store2.pckl')
 print(model.ToString())
 
 me=people()
