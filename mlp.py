@@ -60,7 +60,7 @@ class nsystem:
         return neu
     def train(self, inputData, result, **kwargs):
         tMethod=kwargs.get("trainMethod")
-        tMethod=tMethod if tMethod is not None else Method.GradientDescent
+        tMethod=tMethod if tMethod is not None else method.GradientDescent
         tMethod(self, inputData, result, arg=kwargs)
     def Copy(self):
         p=nsystem()
@@ -172,11 +172,11 @@ class nlayer:
             (index, f, w, b, sig)=n.Proto()
             sender.append([index, f, w, b, sig])
         return [sender, self.index, len(self.children)]
-    def Add(self, f=Normal):
+    def Add(self, f):
         newNeu=nneuron(self)
         self.children.append(newNeu)
         newNeu.index=self.children.index(newNeu)
-        newNeu.f=f
+        newNeu.f=f or Normal
         return newNeu
     def GetAllSig(self):
         sigs=[]
@@ -255,21 +255,37 @@ class nneuron:
         return f'  ({self.index})sig:{self.sig} weights:{self.w} bias:{self.b}'
     def ToStringOnlySig(self):
         return f'({self.sig})'
-class Method:
+class method:
     @classmethod
-    def GradientDescent(cls, sys, inputData, result, arg):
-        sys.fastfeed(inputData)
+    def GradientDescent(cls, sys :nsystem, inputData, result, arg):
         alpha=arg.get("alpha")
         alpha=alpha if alpha is not None else 0.05
-        for i, n in enumerate(sys.out().children):
-            cls.GradientDescentInner(n, trainData=result[i], rate=alpha)
+        series=arg.get("series")
+        verbose=arg.get("verbose") or 0
+        if series:
+            for ind, chunk in enumerate(inputData):
+                if verbose:
+                    pre=sys.evaluate(chunk, result[ind])
+                sys.fastfeed(chunk)
+                for i, n in enumerate(sys.out().children):
+                    cls.GradientDescentInner(n, train=result[ind][i], rate=alpha)
+                if verbose>=1 and ind%10==0:
+                    after=sys.evaluate(chunk, result[ind])
+                    print(f"{ind}:{after}({pre-after} difference) for {chunk}==>{result[ind]}")
+        else:
+            if verbose>=1:
+                pre=sys.evaluate(inputData, result)
+            sys.fastfeed(inputData)
+            for i, n in enumerate(sys.out().children):
+                cls.GradientDescentInner(n, train=result[i], rate=alpha)
+            if verbose>=1:
+                after=sys.evaluate(inputData, result)
+                print(f"single:{after}({pre-after} difference) for {inputData}==>{result}")
+        
     @classmethod
-    def GradientDescentInner(cls, this, **kwargs):
+    def GradientDescentInner(cls, this, train, rate, t=None):
         if this.layer.index<=1:
             return
-        t=kwargs.get("t")
-        rate=kwargs.get("rate")
-        train=kwargs.get("trainData")
         if train==None:
             return -1 
         if t==None:
@@ -279,19 +295,37 @@ class Method:
         dt=dt*this.diffSigZ()
         for i, n in enumerate(this.layer.ProvidePrevNeu()):
             provide=dt*this.w[i]
-            cls.GradientDescentInner(n, t=provide, trainData=train, rate=rate)
+            cls.GradientDescentInner(n, t=provide, train=train, rate=rate)
             this.w[i]=this.w[i] - dt*n.sig*rate
         this.b=this.b - dt*rate
     @classmethod
-    def Genetic(cls, sys, inputData, result, **kwargs):
+    def Genetic(cls, sys, inputData, result, arg):
         #세대당 개체수v, 돌연변이 확률v, 돌연변이 평균v, 돌연변이 표준편차v, 유전 개체군/랜덤 개체군 퍼센트, 교차 방법, 엘리트 유전자 남기는 비율
-        arg=kwargs.get("arg") if kwargs.get("arg") is not None else {}
-        size=arg.get("poolSize") if arg.get("poolSize") is not None else 3
-        muchance=arg.get("muChance") if arg.get("muChance") is not None else 0.1
-        sigma=arg.get("muSigma") if arg.get("muSigma") is not None else 1
-        avg=arg.get("muExp") if arg.get("muExp") is not None else 0
-        eliteRatio=arg.get("eliteRatio") if arg.get("eliteRatio") is not None else 0.2
-        randRatio=arg.get("randRatio") if arg.get("randRatio") is not None else 0.2
+        size=arg.get("poolSize") or 3
+        muchance=arg.get("muChance") or 0.1
+        sigma=arg.get("muSigma") or 1
+        avg=arg.get("muExp") or 0
+        eliteRatio=arg.get("eliteRatio") or 0.2
+        randRatio=arg.get("randRatio") or 0.2
+        series=arg.get("series")
+        verbose=arg.get("verbose") or 0
+        if series:
+            for i, chunk in enumerate(inputData):
+                if verbose>=1:
+                    pre=sys.evaluate(chunk, result[i])
+                cls.GeneticInner(sys, chunk, result[i], size, muchance, sigma, avg, eliteRatio, randRatio)
+                if verbose>=1 and i%10==0:
+                    after=sys.evaluate(chunk, result[i])
+                    print(f"{i}:{after}({pre-after} difference) for {chunk}==>{result[i]}")
+        else:
+            if verbose>=1:
+                pre=sys.evaluate(inputData, result)
+            cls.GeneticInner(sys, inputData, result, size, muchance, sigma, avg, eliteRatio, randRatio)
+            if verbose>=1:
+                after=sys.evaluate(inputData, result)
+                print(f"single:{after}({pre-after} difference) for {inputData}==>{result}")
+    @classmethod
+    def GeneticInner(cls, sys, inputData, result, size=3, muchance=0.1, sigma=1, avg=0, eliteRatio=0.2, randRatio=0.2):
         memory=sys.memory
         if not memory:
             for _ in itertools.repeat(None, size):
