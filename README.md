@@ -74,3 +74,10 @@ nsystem.evaluate(inputData, result)
 ```
 returns diffrence of output of current model between expected result. those two must be an array<br><br>
 
+# Todo
+- [ ] evaluate function returns readable accuracy info
+- [ ] preprocess train data before entering trainMethod
+- [ ] support epochs, batchsize, step
+- [ ] modulize layer and its behave (for cnn)
+- [ ] support multi dimensional layer input (for processing image)
+- [ ] customizable loss function 

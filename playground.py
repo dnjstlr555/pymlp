@@ -14,8 +14,7 @@ for i in range(500):
     else:
         x.append([random.uniform(0,0.3),random.uniform(0,0.3)])
         y.append([0])
-model.train(x, y, trainMethod=mlp.method.Genetic, poolSize=3, muChance=0.05, eliteRatio=0.2, randRatio=0.05, series=True, verbose=1)
+    
 model.train(x, y, trainMethod=mlp.method.GradientDescent, alpha=0.05, series=True, verbose=1)
-
 
 print(f"{model.fastfeed([0,0])} {model.fastfeed([1,1])}")

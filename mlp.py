@@ -54,14 +54,29 @@ class nsystem:
         layer=self.Add()
         for i in range(number):
             n=layer.Add(function)
-            n.sig=defaultSig if defaultSig is not None else 1
+            n.sig=defaultSig if defaultSig is not None else 0
             n.f=function
             neu.append(n)
         return neu
     def train(self, inputData, result, **kwargs):
         tMethod=kwargs.get("trainMethod")
         tMethod=tMethod if tMethod is not None else method.GradientDescent
-        tMethod(self, inputData, result, arg=kwargs)
+        callback=kwargs.get("callback") or None
+        i=inputData
+        r=result
+        if len(i.shape)!=2 and len(i.shape)<2:
+            temp=[]
+            for d in i:
+                temp.append([d])
+            i=temp
+        if len(r.shape)!=2 and len(r.shape)<2:
+            temp=[]
+            for d in r:
+                temp.append([d])
+            r=temp
+        tMethod(self, i, r, arg=kwargs)
+        if callback:
+            callback(i, r, kwargs)
     def Copy(self):
         p=nsystem()
         p.ImportModel(self)
