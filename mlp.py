@@ -4,98 +4,285 @@ import math
 import sympy
 import itertools
 import pickle
+from collections.abc import Sequence
 x,y,z= sympy.symbols('x y z') 
+__leakyConst=0.01
+def get_shape(lst, shape=()):
+    """
+    returns the shape of nested lists similarly to numpy's shape.
+
+    :param lst: the nested list
+    :param shape: the shape up to the current recursion depth
+    :return: the shape including the current depth
+            (finally this will be the full depth)
+    """
+
+    if not isinstance(lst, Sequence):
+        # base case
+        return shape
+
+    # peek ahead and assure all lists in the next depth
+    # have the same length
+    if isinstance(lst[0], Sequence):
+        l = len(lst[0])
+        if not all(len(item) == l for item in lst):
+            msg = 'not all lists have the same length'
+            raise ValueError(msg)
+
+    shape += (len(lst), )
+
+    # recurse
+    shape = get_shape(lst[0], shape)
+
+    return shape
+
 
 class nsystem:
+    """
+    Initialize a perceptron model.
+
+    Args:
+      inputsize:
+        Specify the input size of this model.
+
+    Returns:
+      New nsystem instance
+    """
+
     def __init__(self, inputSize=1):
+        """
+        Initialize a perceptron model.
+
+        Args:
+          inputsize:
+            Specify the input size of this model.
+
+        Returns:
+          New nsystem instance
+        """
         self.children = []
         self.memory = []
-        self.initLayer(inputSize=inputSize)
-    def Add(self):
-        newLayer=nlayer(self)
-        self.children.append(newLayer)
-        newLayer.index=self.children.index(newLayer)
-        return newLayer
-    def Pop(self):
-        return self.children.pop()
-    def ProvidePrevLayer(self, layer):
-        if layer.index>0:
-            return self.children[layer.index-1]
-        else:
-            return layer
+        self.add(number=inputSize)
     def feed(self, input):
+        """
+        Feed the given data manually.
+        Use feedngo(input) instead in normal situation.
+
+        Args:
+          input:
+            Input data
+
+        Raises:
+            Raises when input data does not match with the input size.
+        """
         for i, n in enumerate(self.children[0].children):
             if input[i] is not None:
                 n.sig=input[i]
             else:
                 print("Input size does not match")
                 return
-    def out(self):
-        return self.children[len(self.children)-1]
-    def fastfeed(self, input):
+    def activate(self):
+        """
+        Activate model manually.
+        Use feedngo(input) instead in normal situation.
+        """
+        for l in self.children:
+            l.activate()
+    def feedngo(self, input):
+        """
+        Feed the given data and activate the model.
+
+        Args:
+          input:
+            Input data
+        Returns:
+          Out signals(list)
+        Raises:
+            Raises when input data does not match with the input size.
+        """
         self.feed(input)
-        self.Activate()
-        return self.out().GetAllSig()
+        self.activate()
+        return self.out().sig()
+    def out(self):
+        """
+        returns out signals from the model.
+
+        Returns:
+          Out signals(list)
+        """
+        return self.children[len(self.children)-1]
     def evaluate(self, input, result):
-        self.fastfeed(input)
+        """
+        Evaluate the model by diffrence between given input and result.
+
+        Args:
+          input:
+            Input data
+          result:
+            Data which needs to be compared
+        Returns:
+          Diffrence between result and output(0 to 1, 1 means big diffrence)
+        Raises:
+            Raises when input data does not match with the input size.
+        """
+        self.feedngo(input)
         temp=0
         for i, n in enumerate(self.out().children):
             temp+=(n.sig-result[i])**2
         return temp/len(self.out().children)
-    def Activate(self):
-        for l in self.children:
-            l.ActivateLayer()
-    def initLayer(self, inputSize=1):
-        self.StackLayer(number=inputSize, function=Normal, defaultSig=1)
-    def StackLayer(self, number=1, **kwargs):
-        neu=[]
+    def add(self, number=1, **kwargs):
+        """
+        Add new layer.
+
+        Args:
+          number:
+            Number of neurons of the layer
+          function:
+            Activate function
+          defaultSig:
+            Specify the default signals of neurons
+        Returns:
+          Added layer
+        """
         (defaultSig, function) = (kwargs.get("defaultSig"),kwargs.get("function"))
         function = function if function is not None else Normal
-        layer=self.Add()
+        layer=self._addEmptyLayer()
         for i in range(number):
-            n=layer.Add(function)
+            n=layer.add(function)
             n.sig=defaultSig if defaultSig is not None else 0
             n.f=function
-            neu.append(n)
-        return neu
+        return layer
     def train(self, inputData, result, **kwargs):
+        """
+        Train the model.
+
+        Args:
+          inputData:
+            Input data
+          result:
+            Data which needs to be compared
+          trainMethod:
+            Train method(mlp.method)
+          callback:
+            Callback function to be called after train finished
+          series:
+            True if input data and results are list.
+          verbose:
+            Prints status every ten times of training when it's true
+        Raises:
+            Raises when input data does not match with the input size.
+        """
         tMethod=kwargs.get("trainMethod")
         tMethod=tMethod if tMethod is not None else method.GradientDescent
         callback=kwargs.get("callback") or None
         i=inputData
         r=result
-        if len(i.shape)!=2 and len(i.shape)<2:
-            temp=[]
-            for d in i:
-                temp.append([d])
-            i=temp
-        if len(r.shape)!=2 and len(r.shape)<2:
-            temp=[]
-            for d in r:
-                temp.append([d])
-            r=temp
+        if kwargs.get("series"):
+            if len(get_shape(i))!=2 and len(get_shape(i))<2:
+                temp=[]
+                for d in i:
+                    temp.append(d)
+                i=temp
+            if len(get_shape(r))!=2 and len(get_shape(r))<2:
+                temp=[]
+                for d in r:
+                    temp.append(d)
+                r=temp
         tMethod(self, i, r, arg=kwargs)
         if callback:
             callback(i, r, kwargs)
-    def Copy(self):
+    def copy(self):
+        """
+        Returns new instance of self duplicated
+        Returns:
+          New nsystem which duplicated
+        """
         p=nsystem()
-        p.ImportModel(self)
-        p.__reset__()
+        p.importModel(self)
         return p
-    def ToString(self):
+    def proto(self):
+        """
+        Returns the model's data
+        Index 0 contains parameter infos of the model, index 1 has length of the layer
+        """
+        t=[]
+        for l in self.children:
+            t.append(l.proto())
+        return [t, len(self.children)]
+    def importModel(self, other):
+        """
+        Import model from other nsystem() object directly.
+
+        Args:
+          other:
+            The nsystem() object
+        """
+        p=other.proto()
+        self._importProto(p)
+    def save(self, location='model.pckl'):
+        """
+        Export the model into pckl file.
+        
+        Args:
+          location:
+            haha
+        """
+        if location=="TESTSTR HELLO":
+            return
+        f = open(location, 'wb')
+        pro=self.proto()
+        pickle.dump(pro, f)
+        f.close()
+    def load(self, location='model.pckl'):
+        """
+        load the model from pckl file.
+        
+        Args:
+          location:
+            hoho
+        """
+        if location=="TESTSTR HELLO":
+            return
+        f = open(location, 'rb')
+        obj = pickle.load(f)
+        f.close()
+        self._importProto(obj)
+    def tostr(self):
+        """
+        Returns string output describing the model itself
+        """
         nstr=f'Sys -->\n'
         for n in self.children:
-            nstr+=f'{n.ToString()}\n'
+            nstr+=f'{n.tostr()}\n'
         return nstr
-    def ToStringOnlySig(self):
+    def tostrsig(self):
+        """
+        Returns string of the model's current signals
+        """
         nstr=f'Sys -->'
         for n in self.children:
-            nstr+=f'{n.ToStringOnlySig()} '
+            nstr+=f'{n.tostrsig()} '
         return nstr
-    def GetParams(self):
+    #Inner functions
+    def _addEmptyLayer(self):
+            newLayer=nlayer(self)
+            self.children.append(newLayer)
+            newLayer.index=self.children.index(newLayer)
+            return newLayer
+    def _pop(self):
+            return self.children.pop()
+    def _reset(self):
+            for l in self.children:
+                l.reset()
+    def _getPrevLayer(self, layer):
+        if layer.index>0:
+            return self.children[layer.index-1]
+        else:
+            return layer
+    def _getParams(self):
         p=[]
         for l in self.children:
-            temp=l.ProvideParam()
+            temp=l.getParams()
             if temp is not None:
                 p.append(temp)
         wTable=[]
@@ -112,105 +299,88 @@ class nsystem:
             for e in each:
                 bTable.append(e)
         return (wTable, bTable)
-    def SetParams(self, w, b):
+    def _setParams(self, w, b):
         (iw, ib)=(0,0)
         for l in self.children:
-            (iw, ib)=l.SetParams(w,b,iw,ib)
-    def ImportModel(self, other):
-        p=other.Proto()
-        self.ImportProto(p)
-    def ImportProto(self, other):
+            (iw, ib)=l.setParams(w,b,iw,ib)
+    def _importProto(self, other):
         po=other
         if len(self.children)!=po[1]:
             if len(self.children)<po[1]:
                 for _ in itertools.repeat(None, po[1]-len(self.children)):
-                    self.Add()
+                    self._addEmptyLayer()
             elif len(self.children)>po[1]:
                 for _ in itertools.repeat(None, len(self.children)-po[1]):
-                    self.Pop()
+                    self._pop()
         for i in po[0]:
             this=self.children[i[1]]
             if len(this.children)!=i[2]:
                 if len(this.children)<i[2]:
                     for _ in itertools.repeat(None, i[2]-len(this.children)):
-                        this.Add(Normal)
+                        this.add(Normal)
                 elif len(this.children)>i[2]:
                     for _ in itertools.repeat(None, len(this.children)-i[2]):
-                        this.Pop(Normal)
+                        this.pop()
             for a in i[0]:
                 neu=this.children[a[0]]
                 neu.f=a[1]
                 neu.w=a[2]
                 neu.b=a[3]
                 neu.sig=a[4]
-    def Proto(self):
-        t=[]
-        for l in self.children:
-            t.append(l.Proto())
-        return [t, len(self.children)]
-    def save(self, location='model.pckl'):
-        f = open(location, 'wb')
-        pro=self.Proto()
-        pickle.dump(pro, f)
-        f.close()
-    def load(self, location='model.pckl'):
-        f = open(location, 'rb')
-        obj = pickle.load(f)
-        f.close()
-        self.ImportProto(obj)
-    def __reset__(self):
-        for l in self.children:
-            l.__reset__()
+    def _bareCopy(self):
+        p=self.copy()
+        p._reset()
+        return p
 class nlayer:
-    def __init__(self, sys=None):
+    def __init__(self, sys: nsystem=None):
         self.children = []
         self.index = None
-        self.sys = sys
-    def __reset__(self):
+        self.sys: nsystem = sys
+    def reset(self):
         for n in self.children:
-            n.__reset__()
-    def Pop(self):
+            n.reset()
+    def pop(self):
         return self.children.pop()
-    def ToString(self):
+    def tostr(self):
         nstr=f'Layer {self.index} -->\n'
         for n in self.children:
-            nstr+=f'{n.ToString()}\n'
+            nstr+=f'{n.tostr()}\n'
         return nstr
-    def ToStringOnlySig(self):
+    def tostrsig(self):
         nstr=f'\n Layer {self.index} -->\n'
         for n in self.children:
-            nstr+=f'{n.ToStringOnlySig()} '
+            nstr+=f'{n.tostrsig()} '
         return nstr
-    def Proto(self):
+    def proto(self):
         sender=[]
         for n in self.children:
-            (index, f, w, b, sig)=n.Proto()
+            (index, f, w, b, sig)=n.proto()
             sender.append([index, f, w, b, sig])
         return [sender, self.index, len(self.children)]
-    def Add(self, f):
+    def add(self, f):
         newNeu=nneuron(self)
         self.children.append(newNeu)
         newNeu.index=self.children.index(newNeu)
         newNeu.f=f or Normal
         return newNeu
-    def GetAllSig(self):
+    def sig(self):
         sigs=[]
         for n in self.children:
             sigs.append(n.sig)
         return sigs
-    def ProvidePrevSig(self):
-        prevLayer=self.sys.ProvidePrevLayer(self)
-        prevSig=prevLayer.GetAllSig()
+    def getPrevSigs(self):
+        prevLayer=self.sys._getPrevLayer(self)
+        prevSig=prevLayer.sig()
         return prevSig
-    def ProvidePrevNeu(self):
-        prevLayer=self.sys.ProvidePrevLayer(self)
+    def getPrevNeurons(self):
+        prevLayer=self.sys._getPrevLayer(self)
         return prevLayer.children
-    def ActivateLayer(self):
-        if self.index is 0:
+    def activate(self):
+        if self.index == 0:
             return
         for n in self.children:
-            n.ActivateEach()
-    def ProvideParam(self):
+            n.activate()
+    def getParams(self):
         if self.index <= 0:
             return None
         weights=[]
@@ -219,7 +389,7 @@ class nlayer:
             weights.append({"index":n.index, "v":n.w})
             biases.append({"index":n.index, "v":n.b})
         return {"layer":self.index, "w":weights, "b":biases}
-    def SetParams(self, w, b, iw, ib):
+    def setParams(self, w, b, iw, ib):
         if self.index <= 0:
             return (iw, ib)
         indexW=iw
@@ -240,24 +410,22 @@ class nneuron:
         self.layer = layer
         self.index = None
         self.sig = 1
-        self.w = [random.uniform(0.5,1) for x in range(len(self.layer.ProvidePrevSig()))]
+        self.w = [random.uniform(0.5,1) for x in range(len(self.layer.getPrevSigs()))]
         self.b = random.uniform(0.5,1)
         self.f = Normal
-    def __reset__(self):
+    def reset(self):
         self.sig = 1
-        self.w = [random.uniform(0.5,1) for x in range(len(self.layer.ProvidePrevSig()))]
+        self.w = [random.uniform(0.5,1) for x in range(len(self.layer.getPrevSigs()))]
         self.b = random.uniform(0.5,1)
-    """index, f, w, b, sig
-    """
-    def Proto(self):
+    def proto(self):
         return (self.index, self.f, self.w, self.b, self.sig)
-    def ActivateEach(self):
+    def activate(self):
         self.sig=0
         self.sig=self.f.subs(x, self.Z()) 
     def ActDiff(self):
         return sympy.diff(self.f)
     def Z(self):
-        prev=self.layer.ProvidePrevSig()
+        prev=self.layer.getPrevSigs()
         sum=0
         for i, p in enumerate(prev):
             if self.w[i]==None:
@@ -266,9 +434,9 @@ class nneuron:
         return sum+self.b
     def diffSigZ(self):
         return (self.ActDiff().subs(x,self.Z()))
-    def ToString(self):
+    def tostr(self):
         return f'  ({self.index})sig:{self.sig} weights:{self.w} bias:{self.b}'
-    def ToStringOnlySig(self):
+    def tostrsig(self):
         return f'({self.sig})'
 class method:
     @classmethod
@@ -281,7 +449,7 @@ class method:
             for ind, chunk in enumerate(inputData):
                 if verbose:
                     pre=sys.evaluate(chunk, result[ind])
-                sys.fastfeed(chunk)
+                sys.feedngo(chunk)
                 for i, n in enumerate(sys.out().children):
                     cls.GradientDescentInner(n, train=result[ind][i], rate=alpha)
                 if verbose>=1 and ind%10==0:
@@ -290,7 +458,7 @@ class method:
         else:
             if verbose>=1:
                 pre=sys.evaluate(inputData, result)
-            sys.fastfeed(inputData)
+            sys.feedngo(inputData)
             for i, n in enumerate(sys.out().children):
                 cls.GradientDescentInner(n, train=result[i], rate=alpha)
             if verbose>=1:
@@ -308,7 +476,7 @@ class method:
         else:
             dt=t
         dt=dt*this.diffSigZ()
-        for i, n in enumerate(this.layer.ProvidePrevNeu()):
+        for i, n in enumerate(this.layer.getPrevNeurons()):
             provide=dt*this.w[i]
             cls.GradientDescentInner(n, t=provide, train=train, rate=rate)
             this.w[i]=this.w[i] - dt*n.sig*rate
@@ -344,8 +512,8 @@ class method:
         memory=sys.memory
         if not memory:
             for _ in itertools.repeat(None, size):
-                memory.append({"model":sys.Copy(), "fitness":0})
-            memory.append({"proto":sys.Copy()})
+                memory.append({"model":sys._bareCopy(), "fitness":0})
+            memory.append({"proto":sys._bareCopy()})
         proto=[i["proto"] for i in memory if "proto" in i][0]
         parentPool=[i for i in memory if "model" in i]
         maxFit=0
@@ -360,7 +528,7 @@ class method:
                 maxFit=fit
                 maxModel=model
         if maxModel is not proto:
-            sys.ImportModel(maxModel)
+            sys.importModel(maxModel)
         fTable=[(0 if f.get("fitness") is None else f.get("fitness")) for f in parentPool]
         p=cls.softmax(fTable)
         childPool=[]
@@ -376,11 +544,11 @@ class method:
                     b.append(tb)
             childW=cls.cross(w[0], w[1], muchance, sigma, avg)
             childB=cls.cross(b[0], b[1], muchance, sigma, avg)
-            child=proto.Copy()
-            child.SetParams(childW, childB)
+            child=proto._bareCopy()
+            child._setParams(childW, childB)
             childPool.append({"model":child, "fitness":0})
         for _ in itertools.repeat(None, round(size*randRatio)):
-            child=proto.Copy()
+            child=proto._bareCopy()
             childPool.append({"model":child, "fitness":0})
         parent=np.random.choice(parentPool, p=p, size=round(size*eliteRatio), replace=True)
         for p in parent:
@@ -392,7 +560,7 @@ class method:
         model=e.get("model")
         if not model:
             return (None, None)
-        return model.GetParams()
+        return model._getParams()
 
     @staticmethod
     def softmax(x):
@@ -415,6 +583,5 @@ class method:
 Normal=x
 ReLU=sympy.Max(x, 0)
 Sigmoid=1/(1+sympy.exp(x))
-
-
-
+Tanh=sympy.tanh(x)
+leakyReLU=sympy.Max(x,0*__leakyConst)

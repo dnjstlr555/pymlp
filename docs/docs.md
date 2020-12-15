@@ -4,11 +4,11 @@ mlp.nsystem(inputsize=1)
 ```
 returns new nsystem based on given inputsize<br><br>
 ```python
-nsystem.StackLayer(number=3, function=mlp.Normal, defaultSig=1)
+nsystem.add(number=3, function=mlp.Normal, defaultSig=1)
 ```
 stack a layer, number meaning layer size. function and defaultSig can be ignored<br><br>
 ```python
-nsystem.fastfeed(input)
+nsystem.feedngo(input)
 ```
 returns signals of the output layer after input feeded<br><br>
 ```python
@@ -32,6 +32,8 @@ poolSize meaning the total size of single generation. mutation will happen by ea
 mlp.Normal=x
 mlp.ReLU=sympy.Max(x, 0)
 mlp.Sigmoid=1/(1+sympy.exp(x))
+mlp.Tanh=sympy.tanh(x)
+mlp.
 ```
 # Misc
 ```python
@@ -43,7 +45,7 @@ nsystem.load(location='model.pckl')
 ```
 load model from file<br><br>
 ```python
-nsystem.ToString()
+nsystem.tostr()
 ```
 returns a string describing the model<br><br>
 ```python
@@ -53,30 +55,26 @@ returns diffrence of output of current model between expected result. those two 
 
 # Advance
 ```python
-nsystem.Add()
+nsystem.feed(input)
 ```
-returns empty layer added into model<br><br>
+Feed the given data manually. Use feedngo(input) instead in normal situation.<br><br>
 ```python
-(w,b)=nsystem.GetParams()
+nsystem.activate()
 ```
-returns w,b table<br><br>
+Activate model manually. Use feedngo(input) instead in normal situation.<br><br>
 ```python
-nsystem.SetParams(w, b)
+nsystem.out()
 ```
-set params.<br><br>
+returns out signals from the model.<br><br>
 ```python
-nsystem.Proto()
+nsystem.copy()
 ```
-returns exact copy of model<br><br>
+returns duplicated instance of model<br><br>
 ```python
-nsystem.ImportProto(proto)
-```
-import model from proto<br><br>
-```python
-nsystem.ImportModel(model)
+nsystem.importModel(model)
 ```
 import model directly from other model<br><br>
 ```python
-nlayer.Add(f=mlp.Normal)
+nlayer.add(f=mlp.Normal)
 ```
 returns added neuron<br><br>

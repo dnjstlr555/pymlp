@@ -4,13 +4,12 @@ import mlp
 import random
 
 model=mlp.nsystem(inputSize=2)
-model.StackLayer(number=3, function=mlp.ReLU)
-model.StackLayer(number=1, function=mlp.Sigmoid)
+model.add(number=3, function=mlp.ReLU)
+model.add(number=1, function=mlp.Sigmoid)
 
 x,y=([],[])
 for i in range(500):
-    rand = random.choice((0,1))
-    if rand==0:
+    if random.choice((0,1))==1:
         x.append([random.uniform(0.7,1),random.uniform(0.7,1)])
         y.append([1])
     else:
@@ -18,20 +17,20 @@ for i in range(500):
         y.append([0])
 model.train(x, y, trainMethod=mlp.method.Genetic, poolSize=3, muChance=0.05, eliteRatio=0.2, randRatio=0.05, series=True, verbose=1)
 model.train(x, y, trainMethod=mlp.method.GradientDescent, alpha=0.05, series=True, verbose=1)
-print(f"{model.fastfeed([0,0])} {model.fastfeed([1,1])}")
+print(f"{model.feedngo([0,0])} {model.feedngo([1,1])}")
 ```
-
+Requires sympy and numpy.
 # Model
 ```python
 mlp.nsystem(inputsize=1)
 ```
 returns new nsystem based on given inputsize<br><br>
 ```python
-nsystem.StackLayer(number=3, function=mlp.Normal, defaultSig=1)
+nsystem.add(number=3, function=mlp.Normal, defaultSig=1)
 ```
 stack a layer, number meaning layer size. function and defaultSig can be ignored<br><br>
 ```python
-nsystem.fastfeed(input)
+nsystem.feedngo(input)
 ```
 returns signals of the output layer after input feeded<br><br>
 ```python
@@ -55,6 +54,8 @@ poolSize meaning the total size of single generation. mutation will happen by ea
 mlp.Normal=x
 mlp.ReLU=sympy.Max(x, 0)
 mlp.Sigmoid=1/(1+sympy.exp(x))
+mlp.Tanh=sympy.tanh(x)
+mlp.
 ```
 # Misc
 ```python
@@ -66,7 +67,7 @@ nsystem.load(location='model.pckl')
 ```
 load model from file<br><br>
 ```python
-nsystem.ToString()
+nsystem.tostr()
 ```
 returns a string describing the model<br><br>
 ```python
